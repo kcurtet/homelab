@@ -54,6 +54,22 @@ backup/         # restic scripts + systemd units + restore runbook (Phase 4)
 docs/           # Topology, specs, and per-phase runbooks
 ```
 
+## Status & roadmap
+
+| Piece | Status |
+|-------|--------|
+| Phase 1 — Coolify hosting | Built; live bring-up pending (staging host reinstall) |
+| Phase 1 — Cloudflare Tunnel | Documented and inert — **pending account/domain** |
+| Phase 1 — Let's Encrypt | Documented (two TLS paths); activates with a domain |
+| Phase 2 — Tailscale | Doc verified against a live tailnet |
+| Phase 2 — Wake-on-LAN | Educational script + docs (no wakeable target today) |
+| Phase 3 — Pi-hole DNS/DHCP | Built with DHCP **off** by default; applies only on the Raspberry (**pending hardware**) |
+| Phase 4 — restic backups | Scripts verified with a full local dry-run (backup → restore → diff); live timer pending |
+
+Build artifacts (spec, plan, rulings ledger) live under `docs/specs/` in Spanish —
+they are the working log of how this was designed and built; everything operational
+(runbooks, scripts, compose) is in English.
+
 ## License
 
 [MIT](LICENSE) © Kevin Curtet
