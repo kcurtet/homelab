@@ -13,10 +13,21 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"   # re-login afterwards
 ```
 
-## Install — Raspberry Pi OS 64-bit (final server)
+## Install — Debian 13 / Raspberry Pi OS 64-bit (staging + final server)
+
+Debian path (staging host, see `staging-host.md` for the full install runbook):
 
 ```bash
-curl -fsSL https://get.docker.com | sh
+sudo apt-get update && sudo apt-get install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+```
+
+Add the Docker apt repo (bookworm/trixie as appropriate), then:
+
+```bash
+sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker "$USER"   # re-login afterwards
 ```
 
