@@ -1,0 +1,8 @@
+# Secrets — real values live here, never committed; only .env.example is tracked
+.env
+
+# Runtime data volumes (Coolify state, Pi-hole config, etc.)
+**/data/
+
+# restic local cache
+**/.restic-cache/

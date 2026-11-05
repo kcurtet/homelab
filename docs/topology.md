@@ -1,0 +1,65 @@
+# Topology
+
+This document describes the target topology of the lab, the current staging setup,
+and the key design decision that replaces the original article's manual fallback.
+
+## Target topology (Raspberry Pi era)
+
+```mermaid
+flowchart TD
+    IN(("Internet"))
+    R["Home router<br/>DNS2 — fallback resolver"]
+    PI["Raspberry Pi 5 — final server<br/>• Pi-hole: DNS1 + DHCP<br/>• Coolify: hosting<br/>• restic: backups → USB disk<br/>• Tailscale subnet router<br/>• Wake-on-LAN sender"]
+    F["Household devices<br/>DNS1 = Pi-hole · DNS2 = router"]
+
+    IN <-- "WAN" --> R
+    R <-- "LAN / Wi-Fi" --> PI
+    R <-- "LAN / Wi-Fi" --> F
+    F -. "DNS queries (primary)" .-> PI
+    PI -- "Cloudflare Tunnel<br/>(no open ports)" --> IN
+```
+
+All traffic to and from the internet flows through the router. The Raspberry Pi
+provides DNS (Pi-hole) and DHCP for the whole house, hosts services on Coolify, and
+keeps them backed up with restic. Remote access is Tailscale only — the router never
+opens a port. Cloudflare Tunnel publishes public services without exposing the home IP.
+
+## Current staging
+
+The Raspberry Pi is not on-site yet. Until it arrives, every phase is validated on
+**panther**, a CachyOS laptop that is always on and reachable over the tailnet:
+
+```mermaid
+flowchart LR
+    IN(("Internet"))
+    R["Home router<br/>(unmodified: DNS + DHCP stay here during staging)"]
+    P["panther — staging laptop (CachyOS)<br/>• Coolify (staging)<br/>• Tailscale client"]
+    L["lynx — dev machine<br/>(repo is written here)"]
+
+    IN <--> R
+    R <--> P
+    P <-- "Tailscale tailnet" --> L
+```
+
+During staging, the home network is untouched: the router keeps its normal DNS and
+DHCP roles. Each phase keeps all of its state inside its own directory, so moving from
+panther to the Raspberry Pi is *copy + re-run*, not archaeology.
+
+## Key improvement: automatic DNS failover
+
+The original article's answer to "Pi-hole is down" was a second Wi-Fi SSID that
+bypassed it — a manual workaround (*apaño*) that required family members to switch
+networks. This design **drops** that fallback and replaces it with automatic failover:
+
+- Pi-hole's DHCP advertises **Pi-hole as DNS1** and **the router as DNS2**.
+- If Pi-hole dies, clients fail over to the router on their own. The household keeps
+  internet — ads return until Pi-hole is fixed, but nobody switches anything and
+  nobody waits for the helpdesk.
+
+**Trade-off (accepted):** some clients occasionally query the secondary resolver even
+in normal operation, which leaks some ads. That is the documented cost of the design,
+not a bug.
+
+DNS/DHCP is only ever taken over from the router once the Raspberry Pi is on-site and
+failover has been verified — see `network/` and `docs/runbooks/dhcp-migration.md`
+(Phase 3).
