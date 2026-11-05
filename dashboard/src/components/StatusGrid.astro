@@ -1,0 +1,243 @@
+---
+// Status grid + polling island.
+//
+// Server renders the shell with real project names and flat skeleton bars
+// (loading = final layout, values as grey bars, no shimmer — a no-JS visitor
+// still sees the three phases). A vanilla <script> island then fetches
+// /api/status, renders the cards and re-polls every 10s. A failed poll never
+// touches the cards: only the connection chip and the footer line say
+// "connection lost — retrying".
+import { EXPECTED_PROJECTS } from '../lib/cards';
+import '../styles/global.css';
+---
+
+<section class="sec" aria-labelledby="phases-h">
+  <h2 id="phases-h" class="sec-title">phases</h2>
+  <div class="grid" id="grid">
+    {
+      EXPECTED_PROJECTS.map((name) => (
+        <article class="card is-skeleton" aria-busy="true">
+          <div class="card__head">
+            <h3 class="card__name">{name}</h3>
+            <span class="sk sk--pill" aria-hidden="true" />
+          </div>
+          <div class="sk sk--strip" aria-hidden="true" />
+          <div class="sk sk--meta" aria-hidden="true" />
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<script>
+  import type { ContainerStatus, ProjectState, ProjectStatus } from '../lib/status';
+
+  interface StatusResponse {
+    projects: ProjectStatus[];
+    fetchedAt: string;
+  }
+
+  const POLL_MS = 10_000;
+
+  const STATE_LABELS: Record<ProjectState, string> = {
+    up: 'up',
+    partial: 'partial',
+    down: 'down',
+    'not-deployed': 'not deployed',
+    unreachable: 'unreachable',
+  };
+
+  const CHEVRON =
+    '<svg class="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  const UNREACHABLE_ICON =
+    '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2.8 2.8l6.4 6.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg>';
+
+  const grid = document.getElementById('grid')!;
+  const findingEl = document.getElementById('finding')!;
+  const connEl = document.getElementById('conn')!;
+  const fetchedEl = document.getElementById('fetched')!;
+
+  /** Which project breakdowns are expanded — survives re-renders. */
+  const open = new Set<string>();
+  let lastGood: StatusResponse | null = null;
+  let timer: number | undefined;
+  let inFlight = false;
+
+  function timeOf(iso: string): string {
+    return new Date(iso).toLocaleTimeString([], { hour12: false });
+  }
+
+  function uptime(iso: string): string {
+    const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000));
+    if (mins < 1) return 'up <1m';
+    if (mins < 60) return `up ${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `up ${hours}h ${mins % 60}m`;
+    return `up ${Math.floor(hours / 24)}d ${hours % 24}h`;
+  }
+
+  function containerMeta(c: ContainerStatus): string {
+    if (c.state !== 'running') return c.state;
+    return c.startedAt ? `running · ${uptime(c.startedAt)}` : 'running';
+  }
+
+  function badge(state: ProjectState): HTMLElement {
+    const b = document.createElement('span');
+    b.className = `badge badge--${state}`;
+    // aria-label includes the visible text (it prefixes it with context).
+    b.setAttribute('aria-label', `phase status: ${STATE_LABELS[state]}`);
+    if (state === 'unreachable') b.innerHTML = UNREACHABLE_ICON;
+    const text = document.createElement('span');
+    text.textContent = STATE_LABELS[state];
+    b.appendChild(text);
+    return b;
+  }
+
+  function strip(containers: ContainerStatus[]): HTMLElement {
+    const s = document.createElement('div');
+    s.className = 'strip';
+    const running = containers.filter((c) => c.state === 'running').length;
+    s.setAttribute('role', 'img');
+    s.setAttribute(
+      'aria-label',
+      `${containers.length} container${containers.length === 1 ? '' : 's'}: ${running} running, ${containers.length - running} not running`,
+    );
+    for (const c of containers) {
+      const seg = document.createElement('i');
+      seg.dataset.s = c.state === 'running' ? 'running' : 'stopped';
+      s.appendChild(seg);
+    }
+    return s;
+  }
+
+  function card(p: ProjectStatus): HTMLElement {
+    const art = document.createElement('article');
+    art.className = 'card';
+
+    const head = document.createElement('div');
+    head.className = 'card__head';
+    const name = document.createElement('h3');
+    name.className = 'card__name';
+    name.textContent = p.name;
+    head.append(name, badge(p.state));
+    art.appendChild(head);
+
+    if (p.state === 'unreachable') {
+      const note = document.createElement('p');
+      note.className = 'card__note';
+      note.textContent = "Can't reach the Docker API. Check the socket-proxy.";
+      art.appendChild(note);
+      return art;
+    }
+
+    if (p.containers.length === 0) {
+      art.appendChild(document.createElement('div')).className = 'strip--empty';
+      const note = document.createElement('p');
+      note.className = 'card__note';
+      note.textContent = 'no containers found on this host';
+      art.appendChild(note);
+      return art;
+    }
+
+    art.appendChild(strip(p.containers));
+
+    const running = p.containers.filter((c) => c.state === 'running').length;
+    const n = p.containers.length;
+
+    const rows = document.createElement('ul');
+    rows.className = 'card__rows';
+    rows.id = `rows-${p.name}`;
+    if (!open.has(p.name)) rows.hidden = true;
+    for (const c of p.containers) {
+      const li = document.createElement('li');
+      li.className = 'crow';
+      const dot = document.createElement('span');
+      dot.className = 'crow__dot';
+      dot.dataset.s = c.state === 'running' ? 'running' : 'stopped';
+      const nm = document.createElement('span');
+      nm.className = 'crow__name';
+      nm.textContent = c.name;
+      const meta = document.createElement('span');
+      meta.className = 'crow__meta';
+      meta.textContent = containerMeta(c);
+      li.append(dot, nm, meta);
+      rows.appendChild(li);
+    }
+
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'card__more';
+    more.id = `more-${p.name}`;
+    more.setAttribute('aria-expanded', String(open.has(p.name)));
+    more.setAttribute('aria-controls', rows.id);
+    more.innerHTML = CHEVRON;
+    const label = document.createElement('span');
+    label.textContent = `${n} container${n === 1 ? '' : 's'} · ${running} running`;
+    more.appendChild(label);
+    more.addEventListener('click', () => {
+      const isOpen = more.getAttribute('aria-expanded') === 'true';
+      more.setAttribute('aria-expanded', String(!isOpen));
+      rows.hidden = isOpen;
+      if (isOpen) open.delete(p.name);
+      else open.add(p.name);
+    });
+
+    art.append(more, rows);
+    return art;
+  }
+
+  function findingText(projects: ProjectStatus[]): { text: string; ok: boolean } {
+    const bad = projects.filter((p) => p.state !== 'up');
+    if (bad.length === 0) return { text: `all ${projects.length} phases up`, ok: true };
+    return { text: bad.map((p) => `${p.name} ${STATE_LABELS[p.state]}`).join(' · '), ok: false };
+  }
+
+  function render(data: StatusResponse): void {
+    grid.replaceChildren(...data.projects.map(card));
+    const { text, ok } = findingText(data.projects);
+    findingEl.textContent = text;
+    findingEl.dataset.ok = String(ok);
+  }
+
+  function setConn(state: 'connecting' | 'live' | 'retrying'): void {
+    connEl.dataset.conn = state;
+    const label = connEl.querySelector('.conn__label');
+    if (label) label.textContent = state === 'live' ? 'live' : state;
+  }
+
+  async function poll(): Promise<void> {
+    if (inFlight || document.hidden) return;
+    inFlight = true;
+    try {
+      const res = await fetch('/api/status', {
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as StatusResponse;
+      lastGood = data;
+      render(data);
+      setConn('live');
+      fetchedEl.classList.remove('is-lost');
+      fetchedEl.textContent = `fetched ${timeOf(data.fetchedAt)}`;
+    } catch {
+      // Never touch the cards on a failed poll — say it quietly instead.
+      setConn('retrying');
+      fetchedEl.classList.add('is-lost');
+      fetchedEl.textContent = lastGood
+        ? `connection lost — retrying · last good fetch ${timeOf(lastGood.fetchedAt)}`
+        : 'connection lost — retrying';
+    } finally {
+      inFlight = false;
+      timer = window.setTimeout(poll, POLL_MS);
+    }
+  }
+
+  // Re-poll at once when the tab comes back (a poll may have been skipped).
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) void poll();
+  });
+
+  void poll();
+</script>

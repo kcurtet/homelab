@@ -1,0 +1,77 @@
+---
+// Hub links to the lab's existing admin UIs. Server-rendered from env
+// (HUB_COOLIFY_URL, HUB_PIHOLE_URL, HUB_TAILSCALE_URL); a missing env simply
+// hides that link, and an empty hub hides the whole section.
+// Runtime env first (node adapter container), then dev-time .env.
+const DEFS = [
+  { label: 'Coolify', env: 'HUB_COOLIFY_URL' },
+  { label: 'Pi-hole', env: 'HUB_PIHOLE_URL' },
+  { label: 'Tailscale admin', env: 'HUB_TAILSCALE_URL' },
+] as const;
+
+const links = DEFS.map(({ label, env }) => ({
+  label,
+  url: (process.env[env] ?? import.meta.env[env])?.trim(),
+}))
+  .filter((l): l is { label: string; url: string } => Boolean(l.url))
+  .map((l) => {
+    let host = '';
+    try {
+      host = new URL(l.url).host;
+    } catch {
+      host = '';
+    }
+    return { ...l, host };
+  });
+---
+
+{
+  links.length > 0 && (
+    <section aria-labelledby="hub-h">
+      <h2 id="hub-h" class="sec-title">
+        hub
+      </h2>
+      <ul class="hub__list">
+        {links.map((l) => (
+          <li>
+            <a class="hub__link" href={l.url} target="_blank" rel="noreferrer">
+              <span class="hub__label">{l.label}</span>
+              {l.host && <span class="hub__host">{l.host}</span>}
+              <svg
+                class="hub__arrow"
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                aria-hidden="true"
+              >
+                <path
+                  d="M4 10 10 4M5.5 4H10v4.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span class="sr-only">(opens in a new tab)</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+<style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>

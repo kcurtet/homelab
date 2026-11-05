@@ -11,3 +11,6 @@
 dashboard/node_modules/
 dashboard/dist/
 dashboard/.astro/
+
+# tasteskill working files (direction sheets, inspect screenshots)
+.taste-skill/
