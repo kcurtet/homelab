@@ -63,3 +63,16 @@ not a bug.
 DNS/DHCP is only ever taken over from the router once the Raspberry Pi is on-site and
 failover has been verified — see `network/` and `docs/runbooks/dhcp-migration.md`
 (Phase 3).
+## Origin story
+
+The lab was first built and documented by hand in
+[Reconstruyendo mi homelab: autohospedaje de cero](https://kcurtet.com/proyectos/homelab/)
+(Spanish). That article is the origin story: Pi-hole as house-wide DNS+DHCP, Tailscale +
+Wake-on-LAN for remote access, Coolify hosting published through a Cloudflare Tunnel,
+and restic backups to an old USB disk.
+
+This repo turns that setup into something anyone (including future me) can clone,
+understand, and re-run on any Linux box with Docker — with a couple of design
+improvements over the original (see [docs/topology.md](docs/topology.md)).
+
+## Topology

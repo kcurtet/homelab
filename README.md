@@ -1,74 +1,87 @@
 # Homelab
 
-A reproducible rebuild of my home lab: self-hosted services, network-wide ad blocking,
-remote access, and backups — driven entirely by Docker Compose files, scripts, and
-runbooks that explain **why** each piece exists, not just how to install it.
+Reproducible home lab: Pi-hole as house DNS/DHCP with automatic failover, Coolify
+self-hosted PaaS published through a Cloudflare Tunnel, Tailscale remote access, and
+restic backups to USB. Every phase is plain Docker Compose + runbooks.
 
-This repo doubles as portfolio material for an IT support role: every phase documents
-real decisions, trade-offs, failure modes, and rollback paths — the same way I would
-handle them for a customer.
+Background and design rationale: [docs/topology.md](docs/topology.md).
 
-## Origin story
+## Requirements
 
-The lab was first built and documented by hand in
-[Reconstruyendo mi homelab: autohospedaje de cero](https://kcurtet.com/proyectos/homelab/)
-(Spanish). That article is the origin story: Pi-hole as house-wide DNS+DHCP, Tailscale +
-Wake-on-LAN for remote access, Coolify hosting published through a Cloudflare Tunnel,
-and restic backups to an old USB disk.
+- A Linux host, always on, with Docker + compose plugin —
+  install guide: [docs/runbooks/docker-host.md](docs/runbooks/docker-host.md)
+- Each phase lists extra requirements (Tailscale account, Cloudflare domain, USB disk)
 
-This repo turns that setup into something anyone (including future me) can clone,
-understand, and re-run on any Linux box with Docker — with a couple of design
-improvements over the original (see [docs/topology.md](docs/topology.md)).
+## Install
 
-## Topology
+Install in order. Phases are independent, but the order minimizes blast radius.
+From a fresh clone, per phase:
 
-The target topology — internet ↔ router ↔ Raspberry Pi ↔ household devices, plus the
-current staging host — is diagrammed and explained in **[docs/topology.md](docs/topology.md)**.
+### 1. Hosting — Coolify
 
-Key design point: **automatic DNS failover**. The router is advertised as secondary DNS,
-so if Pi-hole goes down, clients keep internet (ads return) with zero manual switching.
+```bash
+cd hosting/coolify
+cp .env.example .env        # then fill APP_KEY, DB_PASSWORD (commands inside)
+docker compose up -d        # wizard at http://<host>:8000
+```
 
-## Phases
+Deploy a sample site and teardown instructions:
+[docs/runbooks/hosting.md](docs/runbooks/hosting.md).
+Publishing without open ports (Cloudflare Tunnel) and Let's Encrypt are documented
+in the same runbook plus [docs/runbooks/cloudflare-tunnel.md](docs/runbooks/cloudflare-tunnel.md)
+(requires a Cloudflare account/domain).
 
-The build order is by blast radius: phases that only touch disposable hosts come first,
-the shared home network comes last. Follow them in order.
+### 2. Remote access — Tailscale (+ optional WoL)
 
-| Order | Phase | Directory | What it teaches |
-|-------|-------|-----------|-----------------|
-| 1 | [Hosting](hosting/) — Coolify + Cloudflare Tunnel | `hosting/` | Running a PaaS with Compose, publishing services without opening router ports, Let's Encrypt certificates |
-| 2 | [Remote access](remote-access/) — Tailscale + Wake-on-LAN | `remote-access/` | Zero-trust remote access, subnet routing, the limits of WoL over Wi-Fi (educational) |
-| 3 | [Network](network/) — Pi-hole DNS/DHCP + failover | `network/` | Taking over house DNS+DHCP safely, DHCP migration with rollback, DNS failover trade-offs |
-| 4 | [Backups](backup/) — restic to USB | `backup/` | Snapshot backups, retention policy, and the golden rule: a backup without a tested restore is decoration |
+Join the tailnet, SSH over the mesh, optionally advertise the LAN as a subnet
+route: [remote-access/tailscale.md](remote-access/tailscale.md).
+Wake-on-LAN sender (educational): [remote-access/wol/wol.md](remote-access/wol/wol.md).
 
-Each phase is self-contained in its directory and independently verifiable. Nothing
-touches the shared home network until Phase 3, and Phase 3 is only ever applied on the
-final Raspberry Pi host (see the [arrival + retarget checklist](docs/runbooks/raspberry-arrival.md)).
+### 3. DNS/DHCP — Pi-hole
+
+> **Final always-on hardware only.** Never on a laptop or temporary host: taking
+> over DHCP affects every device on the network. DHCP ships **disabled by default**.
+
+```bash
+cd network/pihole
+cp .env.example .env        # ranges, router IP, then follow the migration runbook
+```
+
+Full migration order (verify router DNS → Pi-hole DHCP on → router DHCP off →
+per-device checks) and rollback: [docs/runbooks/dhcp-migration.md](docs/runbooks/dhcp-migration.md).
+
+### 4. Backups — restic
+
+```bash
+cd backup
+cp .env.example /etc/homelab/backup.env     # repo path (USB mount), password file
+# install units + timer, first run, restore drill:
+```
+
+Guide: [backup/README.md](backup/README.md).
+
+## Verify
+
+Quick checks after install (details in each runbook):
+
+```bash
+docker compose config -q                       # in every compose dir: exit 0
+dig @<host> example.com                        # Pi-hole answers (phase 3)
+tailscale ping <node>                          # mesh reachable (phase 2)
+sudo systemctl list-timers homelab-backup.*    # timer scheduled (phase 4)
+```
 
 ## Repository layout
 
 ```
-hosting/        # Coolify + Cloudflare Tunnel (Phase 1)
-remote-access/  # Tailscale docs + Wake-on-LAN script (Phase 2)
-network/        # Pi-hole compose + DHCP migration runbook (Phase 3)
-backup/         # restic scripts + systemd units + restore runbook (Phase 4)
-docs/           # Topology, specs, and per-phase runbooks
+hosting/        # coolify/ and cloudflare/ compose (Phase 1)
+remote-access/  # tailscale.md + wol/ script (Phase 2)
+network/        # pihole/ compose + .env.example (Phase 3)
+backup/         # restic scripts + systemd units (Phase 4)
+docs/           # topology, runbooks, status
 ```
 
-## Status & roadmap
-
-| Piece | Status |
-|-------|--------|
-| Phase 1 — Coolify hosting | Built; live bring-up pending (staging host reinstall) |
-| Phase 1 — Cloudflare Tunnel | Documented and inert — **pending account/domain** |
-| Phase 1 — Let's Encrypt | Documented (two TLS paths); activates with a domain |
-| Phase 2 — Tailscale | Doc verified against a live tailnet |
-| Phase 2 — Wake-on-LAN | Educational script + docs (no wakeable target today) |
-| Phase 3 — Pi-hole DNS/DHCP | Built with DHCP **off** by default; applies only on the Raspberry (**pending hardware**) |
-| Phase 4 — restic backups | Scripts verified with a full local dry-run (backup → restore → diff); live timer pending |
-
-Build artifacts (spec, plan, rulings ledger) live under `docs/specs/` in Spanish —
-they are the working log of how this was designed and built; everything operational
-(runbooks, scripts, compose) is in English.
+Build status of each piece: [docs/status.md](docs/status.md).
 
 ## License
 
