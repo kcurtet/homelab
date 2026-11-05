@@ -27,7 +27,11 @@ services:
   socket-proxy:
     # Least-privilege proxy in front of the Docker socket.
     # Exactly these grants: read-only containers/images/networks/volumes
-    # (+ logs/info/ping) and POST for container lifecycle actions.
+    # Grants: containers (list/inspect/lifecycle/create via POST), logs,
+    # info, ping. POST is method-global, so this also allows exec-CREATE —
+    # exec-START is what the proxy denies (EXEC is not granted), which is the
+    # real barrier. Images/networks/volumes are deliberately NOT granted
+    # (verified: the whole e2e script runs on these five).
     # No ALLOW for exec, build, or auth endpoints.
     image: tecnativa/docker-socket-proxy:v0.5.0
     restart: unless-stopped
@@ -35,9 +39,6 @@ services:
       - CONTAINERS=1
       - POST=1
       - LOGS=1
-      - NETWORKS=1
-      - VOLUMES=1
-      - IMAGES=1
       - INFO=1
       - PING=1
     volumes:

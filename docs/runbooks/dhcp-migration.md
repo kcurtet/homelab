@@ -1,14 +1,14 @@
 # Runbook: DHCP migration to Pi-hole (house DNS/DHCP era)
 
 > **STATUS: BUILT, NOT APPLIED.** This runbook is the activation path for
->
-> Note: this stack runs under compose project `network` (see its `docker-compose.yml`).
 > `network/pihole/` and may only be executed when the **Raspberry Pi 5 is on the
 > LAN and stable**. **NEVER on staging (panther or any laptop):** a second DHCP
 > server on the house network can break connectivity for every device
 > (spec anti-objective; family helpdesk rule — if resolution dies, "the internet
 > is down" for three people). Nothing here is automated: router-side steps are
 > manual by design.
+
+> Note: this stack runs under compose project `network` (see its `docker-compose.yml`).
 
 ## What this implements (and why)
 

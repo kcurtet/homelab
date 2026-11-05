@@ -27,11 +27,27 @@ On the lab host (Docker path in `docker-host.md`):
 ```bash
 cd dashboard
 cp .env.example .env        # port + hub URLs (+ Pi-hole API token if wanted)
+
+# The backup button needs the runner image (podman tags it localhost/…, the
+# dashboard's default; on Docker, tag without localhost/ and set
+# BACKUP_IMAGE=homelab-backup:latest in .env):
+podman build -f backup.Dockerfile -t homelab-backup .   # or: docker build -f backup.Dockerfile -t homelab-backup .
+
 docker compose up -d --build
 curl -s http://127.0.0.1:4321/api/status | head -c 200   # expect JSON
 ```
 
 The compose publishes **only** `127.0.0.1:4321` — nothing listens on the LAN.
+
+> **dockerd note:** the dashboard network is `internal: true` (verified under
+> podman). If `127.0.0.1:4321` does not answer on a Docker host, remove
+> `internal: true` from the compose network and re-check — published ports on
+> internal networks behave differently across daemons.
+>
+> **Ops notes:** if the Docker/podman daemon restarts, the socket-proxy holds a
+> dead socket inode and does not recover on its own — `docker compose restart
+> socket-proxy`. The auth model is tailnet-only **plus** Astro's same-origin
+> check (`security.checkOrigin`, on by default) — do not disable it.
 
 ## Serve inside the tailnet
 

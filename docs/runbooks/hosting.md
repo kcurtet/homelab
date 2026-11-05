@@ -80,6 +80,12 @@ This proves the full path: git clone → build → serve, with no GitHub credent
    page. Pushing a commit to a fork of that repo and redeploying is left as an
    exercise; for this validation a one-shot deploy is enough.
 
+## Compose project
+
+This stack declares `name: hosting` (shared with `hosting/cloudflare/`): both stacks
+run under one compose project, which is what the dashboard treats as the "hosting"
+phase.
+
 ## Let's Encrypt and domains
 
 The article's hosting path used Let's Encrypt certificates that renew themselves, and
