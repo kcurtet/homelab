@@ -1,0 +1,27 @@
+# homelab-backup.service — restic snapshot of the homelab (lab state + repo
+# + /home) plus retention. Triggered nightly by homelab-backup.timer.
+#
+# Install (see backup/README.md):
+#   cp backup/restic/homelab-backup.{service,timer} /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now homelab-backup.timer
+#
+# NOTE: systemd does NOT read backup/.env from the repo — the runbook copies
+# backup/.env.example to /etc/homelab/backup.env (root-owned, chmod 600) and
+# that file is the EnvironmentFile below. The scripts accept those variables
+# directly; backup/.env only fills gaps on manual runs.
+#
+# ExecStart paths assume the repo is checked out at /opt/homelab — adjust if
+# your checkout lives elsewhere (e.g. staging on panther).
+
+[Unit]
+Description=Homelab restic backup (lab state + repo + /home)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/homelab/backup.env
+ExecStart=/opt/homelab/backup/restic/backup.sh
+# Retention is applied right after every successful snapshot, so the policy
+# can never drift behind the data. forget.sh only runs if backup.sh succeeded.
+ExecStartPost=/opt/homelab/backup/restic/forget.sh

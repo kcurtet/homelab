@@ -1,0 +1,19 @@
+# homelab-backup.timer — nightly trigger for homelab-backup.service.
+#
+# 03:00 nightly, plus two quality-of-life properties:
+#   Persistent=true         if the host was off/asleep at 03:00 (a laptop
+#                           running staging counts), run as soon as it boots.
+#   RandomizedDelaySec=15m  spread the start within a 15-minute window so the
+#                           backup does not fire at the exact same second
+#                           every night.
+
+[Unit]
+Description=Nightly homelab restic backup
+
+[Timer]
+OnCalendar=*-*-* 03:00
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target
