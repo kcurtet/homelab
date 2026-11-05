@@ -5,9 +5,12 @@
  * after a mutation so the next poll never shows the pre-action world.
  */
 import type { ProjectStatus } from './status';
+import type { BackupStatus } from './backup';
 
 export interface StatusResponse {
   projects: ProjectStatus[];
+  /** Task 6: manual-backup state + last restic snapshot (TTL 60s probe). */
+  backup: BackupStatus;
   fetchedAt: string;
 }
 

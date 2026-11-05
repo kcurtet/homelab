@@ -562,6 +562,11 @@ a {
   color: var(--text);
 }
 
+/* the author display rule above would otherwise beat the UA's [hidden] */
+.btn[hidden] {
+  display: none;
+}
+
 .btn:disabled {
   background: var(--raised);
   /* still ≥4.5:1 on raised — a disabled control is dimmed, not unreadable */
@@ -615,6 +620,18 @@ a {
 
 .action-note[data-state='err'] {
   color: var(--pill-down-ink);
+}
+
+/* ---- backup card (task 6) ---------------------------------------------- */
+
+/* "back up now" keeps the phase-button weight; the live-logs button is a
+   narrow companion that only exists while a backup runs. */
+.backup__acts #backup-logs {
+  flex: 0 0 auto;
+}
+
+#backup-run[aria-busy='true'] {
+  color: var(--accent);
 }
 
 /* ---- dialogs (confirm modal, log viewer) -------------------------------- */

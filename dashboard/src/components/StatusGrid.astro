@@ -40,11 +40,15 @@ import '../styles/global.css';
 
 <script>
   import type { ContainerStatus, ProjectState, ProjectStatus } from '../lib/status';
+  import type { BackupStatus } from '../lib/backup';
   // Mirror of the server-side gate: which phases need a confirm to stop.
   import { STOP_CONFIRM_PROJECTS } from '../lib/actions';
+  // Fixed name of the dashboard-spawned backup container (task 6).
+  import { MANUAL_BACKUP_CONTAINER } from '../lib/backup';
 
   interface StatusResponse {
     projects: ProjectStatus[];
+    backup: BackupStatus;
     fetchedAt: string;
   }
 
@@ -77,6 +81,72 @@ import '../styles/global.css';
   const connEl = document.getElementById('conn')!;
   const fetchedEl = document.getElementById('fetched')!;
   const noteEl = document.getElementById('action-note')!;
+
+  /* ---- backup card (task 6) ---------------------------------------------- */
+
+  const backupLast = document.getElementById('backup-last')!;
+  const backupCount = document.getElementById('backup-count')!;
+  const backupRun = document.getElementById('backup-run') as HTMLButtonElement;
+  const backupLogs = document.getElementById('backup-logs') as HTMLButtonElement;
+  const backupNote = document.getElementById('backup-note')!;
+
+  function relTime(iso: string): string {
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ${mins % 60}m ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 14) return `${days}d ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+
+  function backupValue(el: HTMLElement, text: string, title = ''): void {
+    el.replaceChildren();
+    const dash = document.createElement('span');
+    dash.className = 'kv__dash';
+    dash.setAttribute('aria-hidden', 'true');
+    dash.textContent = '—';
+    el.append(dash, document.createTextNode(text));
+    if (title) el.title = title;
+    else el.removeAttribute('title');
+  }
+
+  function backupNoteSet(text: string, state: 'ok' | 'err' | ''): void {
+    backupNote.textContent = text;
+    backupNote.dataset.state = state;
+  }
+
+  function renderBackup(b: BackupStatus | undefined): void {
+    if (!b) return; // pre-task shape (stale cache) — leave the skeleton
+
+    // last snapshot / count lines
+    if (b.lastSnapshot) backupValue(backupLast, relTime(b.lastSnapshot), b.lastSnapshot);
+    else if (b.count === null) backupValue(backupLast, 'unknown', b.reason ?? 'snapshot read failed');
+    else backupValue(backupLast, 'none yet');
+    backupValue(backupCount, b.count === null ? 'unknown' : String(b.count));
+
+    // button: disabled with a reason when prerequisites are missing (503
+    // case), busy while a manual backup is in flight
+    const unavailable = !b.available ? b.reason ?? 'backup prerequisites missing' : null;
+    backupRun.disabled = !b.available || b.running || busy();
+    backupRun.textContent = b.running ? 'backing up…' : 'back up now';
+    backupRun.setAttribute('aria-busy', String(b.running));
+    backupRun.title = unavailable ?? '';
+
+    // live logs of the running backup (proves backup.sh is what runs)
+    backupLogs.hidden = !b.running;
+    backupLogs.disabled = !b.running || busy();
+
+    if (b.running) backupNoteSet('backup running — the next snapshot is on its way', 'ok');
+    else if (b.lastRun && b.lastRun.exitCode !== 0)
+      backupNoteSet(
+        `last backup failed (exit ${b.lastRun.exitCode})${b.lastRun.tail ? `: ${b.lastRun.tail}` : ''}`,
+        'err',
+      );
+    else if (unavailable) backupNoteSet(unavailable, 'err');
+    else backupNoteSet('', '');
+  }
 
   /** Which project breakdowns are expanded — survives re-renders. */
   const open = new Set<string>();
@@ -184,6 +254,14 @@ import '../styles/global.css';
   async function startPhase(project: string): Promise<void> {
     await runAction(`start:${project}`, '/api/action/start-phase', { project }, `started ${project}`);
   }
+
+  /** Manual backup: spawn the one-shot backup.sh container (task 6). */
+  async function backupNow(): Promise<void> {
+    await runAction('backup-now', '/api/action/backup-now', {}, 'backup started');
+  }
+
+  backupRun.addEventListener('click', () => void backupNow());
+  backupLogs.addEventListener('click', () => openLogs(MANUAL_BACKUP_CONTAINER));
 
   /** Stop of a confirm-gated phase asks first; everything else runs. */
   function requestStop(project: string): void {
@@ -402,6 +480,7 @@ import '../styles/global.css';
 
   function render(data: StatusResponse): void {
     grid.replaceChildren(...data.projects.map(card));
+    renderBackup(data.backup);
     const { text, ok } = findingText(data.projects);
     findingEl.textContent = text;
     findingEl.dataset.ok = String(ok);

@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { EXPECTED_PROJECTS } from '../../lib/cards';
+import { getBackupStatus } from '../../lib/backupRunner';
 import { inspectContainer, listContainers } from '../../lib/docker';
 import { aggregateProjects } from '../../lib/status';
 import { clearStatusCache, getStatusCache, setStatusCache, type StatusResponse } from '../../lib/statusCache';
@@ -42,11 +43,17 @@ export const GET: APIRoute = async () => {
   const cached = getStatusCache();
   if (cached) return json(cached);
 
+  // Task 6: backup block (last snapshot via a cached probe container +
+  // running flag). Owns its own error handling — a dead docker degrades
+  // this to available:false instead of failing the whole status.
+  const backup = await getBackupStatus();
+
   let body: StatusResponse;
   try {
     const containers = await listContainers();
     body = {
       projects: aggregateProjects(containers, EXPECTED_PROJECTS),
+      backup,
       fetchedAt: new Date().toISOString(),
     };
     await refineStartedAt(body);
@@ -59,6 +66,7 @@ export const GET: APIRoute = async () => {
     );
     body = {
       projects: aggregateProjects([], EXPECTED_PROJECTS, { unreachable: true }),
+      backup,
       fetchedAt: new Date().toISOString(),
     };
   }

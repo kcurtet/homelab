@@ -9,6 +9,7 @@
  * to unix sockets without an extra undici dependency.
  */
 import Docker from 'dockerode';
+import type { BackupContainerSpec } from './backup';
 import type { RawContainer } from './status';
 
 /** Rootless podman socket on the dev machine (lynx); prod sets DOCKER_HOST=tcp://socket-proxy:2375. */
@@ -121,4 +122,33 @@ export function demuxDockerStream(buffer: Buffer): string {
   }
   if (offset === 0 && parts.length === 0) return buffer.toString('utf8');
   return parts.join('');
+}
+
+/* ---- task 6: one-shot containers (manual backup) ----------------------- */
+
+/**
+ * POST /containers/create — the ONLY create call in the dashboard, and it is
+ * fed exclusively by the fixed spec of buildBackupContainerSpec() (task 6).
+ * There is no endpoint that forwards a caller-supplied spec or command.
+ */
+export async function createContainer(spec: BackupContainerSpec): Promise<string> {
+  const container = await dockerClient(ACTION_TIMEOUT_MS).createContainer(spec);
+  return container.id;
+}
+
+/**
+ * POST /containers/{id}/wait. timeoutMs 0 = no request timeout: a backup
+ * runs for minutes and an aborted wait would orphan the exit-code capture.
+ */
+export async function waitForContainer(id: string, timeoutMs = 0): Promise<number> {
+  const result = await dockerClient(timeoutMs).getContainer(id).wait();
+  return result.StatusCode ?? 0;
+}
+
+/**
+ * DELETE /containers/{id}?force=1 — probe cleanup; the manual backup
+ * container removes itself (AutoRemove).
+ */
+export async function removeContainer(id: string): Promise<void> {
+  await dockerClient(ACTION_TIMEOUT_MS).getContainer(id).remove({ force: true });
 }

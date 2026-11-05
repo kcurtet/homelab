@@ -44,12 +44,32 @@ import HubLinks from '../components/HubLinks.astro';
           <ul class="kv">
             <li>
               <span class="kv__label">last snapshot</span>
-              <span class="kv__value">
-                <span class="kv__dash" aria-hidden="true">—</span>coming with the
-                manual-trigger task
-              </span>
+              <span class="kv__value" id="backup-last"
+                ><span class="kv__dash" aria-hidden="true">—</span>checking…</span
+              >
+            </li>
+            <li>
+              <span class="kv__label">snapshots</span>
+              <span class="kv__value" id="backup-count"
+                ><span class="kv__dash" aria-hidden="true">—</span>checking…</span
+              >
             </li>
           </ul>
+          <!-- Rendered live by the StatusGrid island: disabled with a reason
+               when host prerequisites are missing (staging), busy while a
+               manual backup runs. -->
+          <div class="card__acts backup__acts">
+            <button type="button" class="btn" id="backup-run" disabled>back up now</button>
+            <button
+              type="button"
+              class="btn"
+              id="backup-logs"
+              hidden
+              aria-label="view backup log lines"
+              >logs</button
+            >
+          </div>
+          <p class="action-note" id="backup-note" role="status" aria-live="polite"></p>
         </div>
         <HubLinks />
       </div>

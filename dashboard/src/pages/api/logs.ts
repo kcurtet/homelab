@@ -1,6 +1,11 @@
 // GET /api/logs?container=X&lines=200 — last N lines of a whitelisted-phase
 // container (default 200, max 1000). Read-only, no follow, no exec.
+// The dashboard-spawned backup container (fixed name, task 6) is also
+// readable: it is our own container, and its logs are how the UI proves the
+// backup ran backup.sh and surfaces restic lock errors (spec G5).
 import type { APIRoute } from 'astro';
+import { findContainerByName } from '../../lib/actions';
+import { MANUAL_BACKUP_CONTAINER } from '../../lib/backup';
 import { fail, ok, whitelistedContainer } from '../../lib/apiHelpers';
 import { EXPECTED_PROJECTS } from '../../lib/cards';
 import { getContainerLogs, listContainers } from '../../lib/docker';
@@ -23,10 +28,19 @@ export const GET: APIRoute = async ({ url }) => {
 
   try {
     const containers = await listContainers();
-    const found = whitelistedContainer(containers, name, EXPECTED_PROJECTS);
-    if ('response' in found) return found.response;
+    let id: string;
+    if (name === MANUAL_BACKUP_CONTAINER) {
+      // Fixed name, dashboard-spawned: allowed by identity, not by phase.
+      const found = findContainerByName(containers, name);
+      if (!found) return fail(404, `container not found: ${name}`);
+      id = found.Id;
+    } else {
+      const found = whitelistedContainer(containers, name, EXPECTED_PROJECTS);
+      if ('response' in found) return found.response;
+      id = found.container.Id;
+    }
 
-    const text = await getContainerLogs(found.container.Id, lines);
+    const text = await getContainerLogs(id, lines);
     return ok({
       container: name,
       lines,
