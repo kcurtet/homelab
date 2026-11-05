@@ -1,0 +1,8 @@
+# Keep the build context lean and free of local state.
+node_modules
+dist
+.astro
+.env
+.git
+Dockerfile
+docker-compose.yml

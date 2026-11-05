@@ -1,0 +1,53 @@
+# Homelab dashboard: Astro SSR (node adapter) behind a least-privilege
+# docker socket proxy.
+#
+# Security posture (spec 002):
+#   - The only published port binds to 127.0.0.1; the tailnet
+#     (tailscale serve) is the perimeter. Never bind 0.0.0.0.
+#   - The dashboard talks to the Docker API exclusively through
+#     socket-proxy with read-only grants (+ POST for container
+#     lifecycle). exec/build/auth are NOT granted.
+name: dashboard
+
+services:
+  dashboard:
+    build: .
+    image: homelab-dashboard
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=tcp://socket-proxy:2375
+      - EXPECTED_PROJECTS=hosting,network,dashboard
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-4321}:4321"
+    networks:
+      - dash-internal
+    depends_on:
+      - socket-proxy
+
+  socket-proxy:
+    # Least-privilege proxy in front of the Docker socket.
+    # Exactly these grants: read-only containers/images/networks/volumes
+    # (+ logs/info/ping) and POST for container lifecycle actions.
+    # No ALLOW for exec, build, or auth endpoints.
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1
+      - POST=1
+      - LOGS=1
+      - NETWORKS=1
+      - VOLUMES=1
+      - IMAGES=1
+      - INFO=1
+      - PING=1
+    volumes:
+      # Docker host: the raw docker socket, read-only.
+      # NOTE: on a podman host point this at the podman socket instead, e.g.:
+      #   - /run/user/1000/podman/podman.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - dash-internal
+
+networks:
+  dash-internal:
+    internal: true

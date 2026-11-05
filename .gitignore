@@ -6,3 +6,8 @@
 
 # restic local cache
 **/.restic-cache/
+
+# Dashboard build artifacts
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.astro/
