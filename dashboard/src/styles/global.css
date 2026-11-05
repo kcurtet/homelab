@@ -371,10 +371,14 @@ a {
 }
 
 .crow__name {
+  flex: 0 1 auto;
+  min-width: 0;
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crow__meta {
@@ -657,7 +661,7 @@ dialog.modal {
   padding: 6px 16px;
 }
 
-dialog.lv {
+dialog.lv[open] {
   width: min(94vw, 880px);
   max-height: min(84dvh, 720px);
   display: flex;

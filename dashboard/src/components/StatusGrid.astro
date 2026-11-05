@@ -254,8 +254,9 @@ import '../styles/global.css';
   }
 
   function containerMeta(c: ContainerStatus): string {
+    // The green/grey dot already says running/exited; the text only adds uptime.
     if (c.state !== 'running') return c.state;
-    return c.startedAt ? `running · ${uptime(c.startedAt)}` : 'running';
+    return c.startedAt ? uptime(c.startedAt) : 'running';
   }
 
   function badge(state: ProjectState): HTMLElement {
@@ -355,6 +356,7 @@ import '../styles/global.css';
       const nm = document.createElement('span');
       nm.className = 'crow__name';
       nm.textContent = c.name;
+      nm.title = c.name; // full name on hover (the row truncates long names)
       const meta = document.createElement('span');
       meta.className = 'crow__meta';
       meta.textContent = containerMeta(c);
