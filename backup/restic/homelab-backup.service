@@ -25,3 +25,20 @@ ExecStart=/opt/homelab/backup/restic/backup.sh
 # Retention is applied right after every successful snapshot, so the policy
 # can never drift behind the data. forget.sh only runs if backup.sh succeeded.
 ExecStartPost=/opt/homelab/backup/restic/forget.sh
+
+# --- Hardening: this unit reads all of /home and holds the repo password file,
+# so it gets the strictest sandbox that still lets restic work. If staging uses
+# a RESTIC_REPOSITORY outside /mnt/backup (e.g. a local dir), add that path to
+# ReadWritePaths too.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/mnt/backup
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# Dedicated cache dir (restic refuses to run without a writable cache).
+CacheDirectory=homelab-restic
+Environment=RESTIC_CACHE_DIR=/var/cache/homelab-restic

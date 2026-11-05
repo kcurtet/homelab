@@ -92,10 +92,10 @@
 - Crear: `remote-access/tailscale.md`, `remote-access/wol/wake`, `remote-access/wol/wol.md`, `remote-access/.env.example` (`WOL_MAC=`, `WOL_BROADCAST=`)
 
 **Interfaces:**
-- Produce: doc de acceso remoto verificada contra el tailnet real (`<your-tailnet>`); script educativo `wake` que emite magic packet UDP.
+- Produce: doc de acceso remoto verificada contra el tailnet real (the real tailnet); script educativo `wake` que emite magic packet UDP.
 
 - [ ] **Paso 1: escribir `tailscale.md`** — unirse al tailnet existente (auth key), SSH por Tailscale, subnet router en el servidor final (`tailscale up --advertise-routes=192.168.1.0/24` + aprobación en admin console), checklist de verificación con `tailscale status`/`tailscale ping`.
-- [ ] **Paso 2: verificar doc contra el tailnet real** — Run: `ssh panther-wifi 'tailscale status | head -5'` — Expected: nodos del tailnet listados; ajustar la doc si algún comando difiere.
+- [ ] **Paso 2: verificar doc contra el tailnet real** — Run: `tailscale status | head -5 (en cualquier nodo del tailnet)` — Expected: nodos del tailnet listados; ajustar la doc si algún comando difiere.
 - [ ] **Paso 3: escribir `wake`** — bash: valida MAC (regex), lee `WOL_MAC`/`WOL_BROADCAST` del `.env` del directorio o args, emite 16×MAC via `/dev/udp` (sin dependencias) o `wakeonlan` si existe; exit 0 y mensaje "educational — no target expected".
 - [ ] **Paso 4: verificar script** — Run: `bash -n remote-access/wol/wake && shellcheck remote-access/wol/wake` (si shellcheck está) y `remote-access/wol/wake --selftest` — Expected: selftest emite packet a 127.0.0.1 y escucha con `nc -ul` un frame de 102 bytes.
 - [ ] **Paso 5: escribir `wol.md`** — prerrequisitos (UEFI: WoL enabled; Linux: `ethtool -s iface wol g` persistente), por qué el emisor debe ser host encendido con cable, y etiqueta **EDUCATIONAL** (sin objetivo verificable hoy).

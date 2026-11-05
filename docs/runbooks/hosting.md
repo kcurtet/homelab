@@ -74,11 +74,30 @@ This proves the full path: git clone → build → serve, with no GitHub credent
 2. Use MDN's starter site: `https://github.com/mdn/beginner-html-site-styled`
    (plain HTML/CSS — ideal as a static sample).
 3. Build pack: **Static** (Coolify detects it; a Dockerfile is not needed).
-4. Leave the domain empty for now — real domains arrive with the Cloudflare Tunnel
+4. Leave the domain empty for now — see "Let's Encrypt and domains" below
    phase. Coolify assigns a high port instead.
 5. Deploy, then open `http://<host>:<assigned-port>` — you should see the MDN starter
    page. Pushing a commit to a fork of that repo and redeploying is left as an
    exercise; for this validation a one-shot deploy is enough.
+
+## Let's Encrypt and domains
+
+The article's hosting path used Let's Encrypt certificates that renew themselves, and
+that is exactly what Coolify does once a real domain points at the server. Two
+publication paths exist, and they differ in **where TLS terminates**:
+
+- **Cloudflare Tunnel** (the default here, `hosting/cloudflare/`): TLS terminates at
+  Cloudflare's edge; Cloudflare issues the public certificate. No Let's Encrypt
+  certificate is needed on the server and no port is opened. Activate with the
+  checklist in `cloudflare-tunnel.md` when the account/domain exist.
+- **Direct Let's Encrypt**: when a domain's DNS points straight at the server (later,
+  Raspberry era), create the app in Coolify with a FQDN placeholder like
+  `app.example.com` and enable **Let's Encrypt** — Coolify requests and auto-renews
+  the certificate via its Traefik proxy. Requires ports 80/443 reachable from the
+  internet on that host.
+
+Until a domain exists, both paths are intentionally inert: deploy with an empty
+domain and browse the app via the server's LAN address.
 
 ## 4. Teardown
 
