@@ -60,6 +60,12 @@ cp .env.example /etc/homelab/backup.env     # repo path (USB mount), password fi
 
 Guide: [backup/README.md](backup/README.md).
 
+### 5. Dashboard — one pane for the lab
+
+Status cards per phase, hub links, whitelisted actions (restart, phase start/stop,
+logs, manual backup). Tailscale-only by design:
+[docs/runbooks/dashboard.md](docs/runbooks/dashboard.md).
+
 ## Verify
 
 Quick checks after install (details in each runbook):
@@ -69,6 +75,7 @@ docker compose config -q                       # in every compose dir: exit 0
 dig @<host> example.com                        # Pi-hole answers (phase 3)
 tailscale ping <node>                          # mesh reachable (phase 2)
 sudo systemctl list-timers homelab-backup.*    # timer scheduled (phase 4)
+curl -s http://127.0.0.1:4321/api/status        # dashboard answers (phase 5)
 ```
 
 ## Repository layout
@@ -78,6 +85,7 @@ hosting/        # coolify/ and cloudflare/ compose (Phase 1)
 remote-access/  # tailscale.md + wol/ script (Phase 2)
 network/        # pihole/ compose + .env.example (Phase 3)
 backup/         # restic scripts + systemd units (Phase 4)
+dashboard/      # astro status+actions UI, tailscale-only (Phase 5)
 docs/           # topology, runbooks, status
 ```
 
