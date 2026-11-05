@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+# wake — educational Wake-on-LAN magic packet sender.
+#
+# Sends a magic packet (6 x 0xFF followed by the target MAC repeated 16
+# times, 102 bytes total) as a UDP datagram — normally to the LAN broadcast
+# address so every host's NIC sees it.
+#
+# Dependencies: bash (>= 4) and its built-in /dev/udp redirection. No
+# wakeonlan/ether-wake required. `od` and `nc` are used by --selftest only.
+#
+# Target comes from arguments (--mac, --broadcast) or from
+# remote-access/.env (WOL_MAC, WOL_BROADCAST). The .env file is gitignored:
+# this repo is public and MACs are identifiers — never commit a real one.
+#
+# EDUCATIONAL: the lab currently has no WoL-capable target (all machines are
+# laptops; see wol/wol.md). Running this is expected to wake nothing and
+# exit 0.
+
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ENV_FILE="$SCRIPT_DIR/../.env"
+WOL_PORT=9
+
+usage() {
+    cat <<'EOF'
+wake — educational Wake-on-LAN magic packet sender
+
+Usage:
+  wake [--mac AA:BB:CC:DD:EE:FF] [--broadcast 192.168.1.255]
+  wake --selftest
+  wake --help
+
+Options:
+  --mac MAC        Target MAC address (XX:XX:XX:XX:XX:XX, - also accepted).
+  --broadcast ADDR Destination address (default 255.255.255.255, or any
+                   address you can reach on the target's LAN segment).
+                   NOTE: bash /dev/udp cannot set SO_BROADCAST, so broadcast
+                   addresses on the local subnet are rejected by the kernel;
+                   a unicast LAN address works (see wol.md).
+  --selftest       Send to 127.0.0.1 and verify the 102-byte frame with a
+                   local UDP listener; proves the sender works end to end.
+  --help           Show this help.
+
+MAC and broadcast fall back to WOL_MAC / WOL_BROADCAST in
+remote-access/.env (copy from .env.example). Arguments win over .env.
+
+EOF
+}
+
+die() {
+    printf 'wake: %s\n' "$*" >&2
+    exit 1
+}
+
+# Read WOL_MAC / WOL_BROADCAST from the env file without sourcing it
+# (a .env file must never be executed as shell code).
+read_env() {
+    local key val
+    [[ -r $ENV_FILE ]] || return 0
+    while IFS='=' read -r key val; do
+        [[ $key == WOL_MAC || $key == WOL_BROADCAST ]] || continue
+        val=${val%$'\r'}
+        val=${val#\"} ; val=${val%\"}
+        val=${val#\'} ; val=${val%\'}
+        case $key in
+            WOL_MAC)       ENV_MAC=$val ;;
+            WOL_BROADCAST) ENV_BROADCAST=$val ;;
+        esac
+    done < "$ENV_FILE"
+}
+
+validate_mac() {
+    [[ $1 =~ ^[0-9A-Fa-f]{2}([-:][0-9A-Fa-f]{2}){5}$ ]]
+}
+
+validate_ipv4() {
+    local octet
+    [[ $1 =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
+    for octet in "${BASH_REMATCH[@]:1}"; do
+        (( 10#$octet <= 255 )) || return 1
+    done
+    return 0
+}
+
+# Build the magic packet as a printf escape string and write the resulting
+# 102 bytes straight to the UDP socket. The binary frame is never stored in
+# a variable, so MACs containing 00 octets (NUL bytes) are safe.
+#
+# Known limitation: bash's /dev/udp cannot set SO_BROADCAST, so the kernel
+# rejects broadcast destinations (255.255.255.255, or a directed broadcast
+# like 192.168.1.255 on the local subnet) with EACCES. Unicast destinations
+# work; see wol.md for real-deployment workarounds.
+send_frame() {
+    local mac=$1 dest=$2 port=$3 esc fmt i
+    mac=${mac//-/:}
+    esc="\\x${mac//:/\\x}"          # AA:BB:CC:DD:EE:FF -> \xAA\xBB\xCC\xDD\xEE\xFF
+    fmt='\xff\xff\xff\xff\xff\xff'  # synchronization stream: 6 x 0xFF
+    for ((i = 0; i < 16; i++)); do
+        fmt+=$esc                   # target MAC, 16 times
+    done
+    if ! printf '%b' "$fmt" 2>/dev/null > "/dev/udp/${dest}/${port}"; then
+        printf 'wake: cannot send to %s:%s.\n' "$dest" "$port" >&2
+        printf 'wake: likely cause: bash /dev/udp cannot set SO_BROADCAST; the kernel\n' >&2
+        printf 'wake: rejects broadcast destinations (e.g. 255.255.255.255 or your\n' >&2
+        printf 'wake: subnet broadcast). Workarounds: --broadcast <unicast LAN IP>\n' >&2
+        printf 'wake: (needs a static ARP entry on the sleeping host), or use\n' >&2
+        printf 'wake: wakeonlan/ether-wake for true broadcast. See wol.md.\n' >&2
+        return 1
+    fi
+}
+
+selftest() {
+    local mac bcast=127.0.0.1 port pid tmp received got_hex expected_hex hex
+    local passes=0
+
+    # UDP port 9 is privileged (< 1024): only root may listen on it. The
+    # unprivileged fallback proves the same send path against a high port.
+    if [[ $EUID -eq 0 ]]; then
+        port=9
+    else
+        port=59009
+        echo "selftest: note: not root, listening on ${port} instead of privileged port 9"
+    fi
+
+    for mac in AA:BB:CC:DD:EE:FF 00:11:22:33:44:55; do
+        tmp=$(mktemp)
+        pid=''
+        trap '[[ -n ${pid:-} ]] && kill "$pid" 2>/dev/null || true; rm -f "$tmp"' RETURN
+
+        nc -ul "$bcast" "$port" > "$tmp" &
+        pid=$!
+        sleep 0.3   # let the listener bind
+
+        send_frame "$mac" "$bcast" "$port" || {
+            echo "selftest: FAIL (${mac}): send to ${bcast}:${port} failed"
+            return 1
+        }
+
+        received=0
+        for _ in {1..30}; do
+            received=$(($(wc -c < "$tmp")))
+            (( received >= 102 )) && break
+            sleep 0.1
+        done
+        [[ -n $pid ]] && { kill "$pid" 2>/dev/null || true; }
+        wait "$pid" 2>/dev/null || true
+        pid=''
+
+        if (( received != 102 )); then
+            echo "selftest: FAIL (${mac}): expected 102 bytes, got ${received}"
+            return 1
+        fi
+
+        got_hex=$(od -An -tx1 -v < "$tmp" | tr -d ' \n')
+        hex=${mac//:/}
+        hex=${hex,,}
+        expected_hex=$(printf 'ff%.0s' {1..6})
+        for ((i = 0; i < 16; i++)); do
+            expected_hex+=$hex
+        done
+        if [[ $got_hex != "$expected_hex" ]]; then
+            echo "selftest: FAIL (${mac}): frame content mismatch"
+            echo "  expected: ${expected_hex}"
+            echo "  got:      ${got_hex}"
+            return 1
+        fi
+
+        echo "selftest: PASS (${mac}): 102 bytes to ${bcast}:${port} = ff x6 + MAC x16"
+        passes=$((passes + 1))
+    done
+
+    echo "selftest: ${passes}/2 frames verified (0xFF x6 + MAC x16, 102 bytes each)"
+    return 0
+}
+
+ARG_MAC='' ARG_BROADCAST='' DO_SELFTEST=false
+while (( $# > 0 )); do
+    case $1 in
+        --mac)       [[ $# -ge 2 ]] || die "--mac needs a value"; ARG_MAC=$2; shift 2 ;;
+        --broadcast) [[ $# -ge 2 ]] || die "--broadcast needs a value"; ARG_BROADCAST=$2; shift 2 ;;
+        --selftest)  DO_SELFTEST=true; shift ;;
+        -h|--help)   usage; exit 0 ;;
+        *)           usage >&2; die "unknown argument: $1" ;;
+    esac
+done
+
+if [[ $DO_SELFTEST == true ]]; then
+    selftest
+    exit $?
+fi
+
+read_env
+MAC=${ARG_MAC:-${ENV_MAC:-}}
+BROADCAST=${ARG_BROADCAST:-${ENV_BROADCAST:-255.255.255.255}}
+
+[[ -n $MAC ]] || { usage >&2; die "no MAC: pass --mac or set WOL_MAC in remote-access/.env (see .env.example)"; }
+validate_mac "$MAC" || die "invalid MAC '${MAC}' (expected XX:XX:XX:XX:XX:XX)"
+validate_ipv4 "$BROADCAST" || die "invalid IPv4 address '${BROADCAST}'"
+
+send_frame "$MAC" "$BROADCAST" "$WOL_PORT" || exit 1
+printf 'wake: sent magic packet for %s to %s:%s (102 bytes)\n' "${MAC//-/:}" "$BROADCAST" "$WOL_PORT"
+echo "wake: educational — no target expected (all current lab machines are laptops; see remote-access/wol/wol.md)"
+exit 0
