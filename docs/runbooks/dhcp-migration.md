@@ -1,6 +1,8 @@
 # Runbook: DHCP migration to Pi-hole (house DNS/DHCP era)
 
 > **STATUS: BUILT, NOT APPLIED.** This runbook is the activation path for
+>
+> Note: this stack runs under compose project `network` (see its `docker-compose.yml`).
 > `network/pihole/` and may only be executed when the **Raspberry Pi 5 is on the
 > LAN and stable**. **NEVER on staging (panther or any laptop):** a second DHCP
 > server on the house network can break connectivity for every device
@@ -10,9 +12,9 @@
 
 ## What this implements (and why)
 
-Spec, "Improvements over the article" #1: the original setup's answer to
-"Pi-hole is down" was a fallback Wi-Fi SSID the family had to switch to. That
-manual workaround is replaced by **automatic DNS failover**:
+Spec, "Improvements over the article" #1: the original setup had no fallback —
+Pi-hole was the only DNS, so "Pi-hole is down" meant "no internet" for the whole
+house. This design adds **automatic DNS failover**:
 
 - Pi-hole's DHCP hands out leases with **DNS1 = the Pi-hole host** and
   **DNS2 = the router** (`FTLCONF_misc_dnsmasq_lines` in the compose injects

@@ -20,6 +20,8 @@
 # official compose keeps a 0-replica `soketi` placeholder only so upgrades from pre-4.4
 # installs don't break. It is kept here for fidelity and never starts.
 
+name: hosting
+
 services:
   soketi:
     # Inert placeholder inherited from the official compose (see header note).

@@ -20,6 +20,8 @@
 #     target Coolify services as http://host.docker.internal:<port>. From inside the
 #     container, `localhost:<port>` is the container itself — a classic gotcha,
 #     documented in the runbook.
+name: hosting
+
 services:
   cloudflared:
     image: cloudflare/cloudflared:2026.10.7

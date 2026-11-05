@@ -1,7 +1,7 @@
 # Topology
 
 This document describes the target topology of the lab, the current staging setup,
-and the key design decision that replaces the original article's manual fallback.
+and the key design decision that fixes the original setup's single point of failure.
 
 ## Target topology (Raspberry Pi era)
 
@@ -47,9 +47,9 @@ panther to the Raspberry Pi is *copy + re-run*, not archaeology.
 
 ## Key improvement: automatic DNS failover
 
-The original article's answer to "Pi-hole is down" was a second Wi-Fi SSID that
-bypassed it — a manual workaround (*apaño*) that required family members to switch
-networks. This design **drops** that fallback and replaces it with automatic failover:
+The original setup had no answer to "Pi-hole is down": Pi-hole was the only DNS
+handed out by DHCP, so if it died the whole house lost name resolution until I fixed
+it. This design removes that single point of failure with automatic failover:
 
 - Pi-hole's DHCP advertises **Pi-hole as DNS1** and **the router as DNS2**.
 - If Pi-hole dies, clients fail over to the router on their own. The household keeps

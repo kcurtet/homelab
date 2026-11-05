@@ -37,6 +37,8 @@
 #   ACCEPTED TRADE-OFF (documented, not a bug): some clients occasionally use
 #   DNS2 in normal operation and see unblocked ads. See the mandatory section
 #   in docs/runbooks/dhcp-migration.md.
+name: network
+
 services:
   pihole:
     # Pinned to the latest stable v6 tag at research time (Docker Hub,
