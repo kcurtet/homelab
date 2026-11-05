@@ -11,3 +11,4 @@ Ruling: sin backup pre-wipe NVMe (humano confirma que todo está duplicado en ly
 Task 3: build complete, live validation DEFERRED (panther reinstall)
 Task 4: complete (cloudflared 2026.10.7 pinned, compose config verificado en dev, inerte por diseño — activación gated en checklist del runbook; sin validación live pendiente)
 Task 5: complete (tailscale.md verificada contra el tailnet real desde lynx — panther en reinstalación, sin ssh: `tailscale status`/`tailscale ping` OK, quirk MagicDNS resolved+NM documentado como síntoma con workaround IPs 100.x; wake en bash puro /dev/udp: shellcheck 0.10.0 limpio (binario estático, no instalado en el sistema), selftest 2/2 — 102 bytes verificados vía `nc -ul` incluida MAC con octetos 00; limitación documentada: /dev/udp no puede SO_BROADCAST → broadcast de subred local da EACCES con diagnóstico propio, workarounds unicast/wakeonlan; WoL queda EDUCATIONAL)
+Task 6: build complete, live validation DEFERRED (panther reinstall)
