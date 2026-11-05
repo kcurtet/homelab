@@ -9,3 +9,4 @@ Ruling: podman evaluado por petición del humano — Coolify v4 estable es Docke
 Ruling: panther pasa de CachyOS a Debian estable como servidor (decisión humana tras diagnosticar grub.cfg con 10_linux vacío por la actualización interrumpida del 26 oct). El staging de T3/T6/T7 se hace sobre Debian; docker-host.md gana sección Debian. Antes del wipe: backup de /home y /etc útil a /data (USB 310G libres). Instalación Debian: física con netinstall; Docker y validaciones después por ssh.
 Ruling: sin backup pre-wipe NVMe (humano confirma que todo está duplicado en lynx). Debian 13.7 netinst + ext4 + IP fija 192.168.1.100; runbook staging-host.md creada; docker-host.md gana camino Debian.
 Task 3: build complete, live validation DEFERRED (panther reinstall)
+Task 4: complete (cloudflared 2026.10.7 pinned, compose config verificado en dev, inerte por diseño — activación gated en checklist del runbook; sin validación live pendiente)
