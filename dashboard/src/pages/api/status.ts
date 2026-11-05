@@ -1,20 +1,36 @@
 import type { APIRoute } from 'astro';
 import { EXPECTED_PROJECTS } from '../../lib/cards';
-import { listContainers } from '../../lib/docker';
-import { aggregateProjects, type ProjectStatus } from '../../lib/status';
+import { inspectContainer, listContainers } from '../../lib/docker';
+import { aggregateProjects } from '../../lib/status';
+import { clearStatusCache, getStatusCache, setStatusCache, type StatusResponse } from '../../lib/statusCache';
 
 export const prerender = false;
 
-interface StatusResponse {
-  projects: ProjectStatus[];
-  fetchedAt: string;
-}
+// Cache lives in lib/statusCache so the action routes can invalidate it.
 
-// In-memory cache (spec: no DB, state is "now") so concurrent polls don't
-// hammer the socket-proxy. Module-level: one entry per endpoint, survives
-// across requests within the node server process.
-const TTL_MS = 10_000;
-const cache = new Map<string, { body: StatusResponse; expiresAt: number }>();
+/**
+ * Refine startedAt with the real one from inspect. The list endpoint only
+ * exposes Created (container creation), which never changes across restarts;
+ * G3 wants the uptime to visibly reset. Best effort: on any inspect failure
+ * the Created-based approximation from aggregateProjects stays.
+ */
+async function refineStartedAt(body: StatusResponse): Promise<void> {
+  await Promise.all(
+    body.projects.flatMap((p) =>
+      p.containers
+        .filter((c) => c.state === 'running')
+        .map(async (c) => {
+          try {
+            const info = await inspectContainer(c.name);
+            const started = new Date(info.State.StartedAt);
+            if (!Number.isNaN(started.getTime())) c.startedAt = started.toISOString();
+          } catch {
+            // one flaky inspect never degrades the whole status page
+          }
+        }),
+    ),
+  );
+}
 
 function json(body: StatusResponse): Response {
   return new Response(JSON.stringify(body), {
@@ -23,11 +39,8 @@ function json(body: StatusResponse): Response {
 }
 
 export const GET: APIRoute = async () => {
-  const now = Date.now();
-  const cached = cache.get('status');
-  if (cached && cached.expiresAt > now) {
-    return json(cached.body);
-  }
+  const cached = getStatusCache();
+  if (cached) return json(cached);
 
   let body: StatusResponse;
   try {
@@ -36,6 +49,7 @@ export const GET: APIRoute = async () => {
       projects: aggregateProjects(containers, EXPECTED_PROJECTS),
       fetchedAt: new Date().toISOString(),
     };
+    await refineStartedAt(body);
   } catch (error) {
     // Review focus 3: docker being down never 500s the UI — every card
     // degrades to 'unreachable' with HTTP 200.
@@ -49,6 +63,6 @@ export const GET: APIRoute = async () => {
     };
   }
 
-  cache.set('status', { body, expiresAt: now + TTL_MS });
+  setStatusCache(body);
   return json(body);
 };

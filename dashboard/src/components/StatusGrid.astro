@@ -7,7 +7,14 @@
 // /api/status, renders the cards and re-polls every 10s. A failed poll never
 // touches the cards: only the connection chip and the footer line say
 // "connection lost — retrying".
+//
+// Task 5 adds the whitelisted actions: phase start/stop buttons per card
+// (stop of `hosting` goes through the confirm modal — it takes down public
+// publishing), per-container restart + logs in the breakdown, and a log
+// viewer overlay. Actions are single-flight: while one runs, every action
+// button is disabled, and a successful action re-polls immediately.
 import { EXPECTED_PROJECTS } from '../lib/cards';
+import LogViewer from './LogViewer.astro';
 import '../styles/global.css';
 ---
 
@@ -27,14 +34,26 @@ import '../styles/global.css';
       ))
     }
   </div>
+  <p class="action-note" id="action-note" role="status" aria-live="polite"></p>
+  <LogViewer />
 </section>
 
 <script>
   import type { ContainerStatus, ProjectState, ProjectStatus } from '../lib/status';
+  // Mirror of the server-side gate: which phases need a confirm to stop.
+  import { STOP_CONFIRM_PROJECTS } from '../lib/actions';
 
   interface StatusResponse {
     projects: ProjectStatus[];
     fetchedAt: string;
+  }
+
+  interface LogsResponse {
+    ok: boolean;
+    container?: string;
+    lines?: number;
+    logs?: string[];
+    error?: string;
   }
 
   const POLL_MS = 10_000;
@@ -57,12 +76,169 @@ import '../styles/global.css';
   const findingEl = document.getElementById('finding')!;
   const connEl = document.getElementById('conn')!;
   const fetchedEl = document.getElementById('fetched')!;
+  const noteEl = document.getElementById('action-note')!;
 
   /** Which project breakdowns are expanded — survives re-renders. */
   const open = new Set<string>();
   let lastGood: StatusResponse | null = null;
   let timer: number | undefined;
   let inFlight = false;
+
+  /* ---- actions (task 5) ------------------------------------------------ */
+
+  /** Keys of in-flight actions; any pending action disables all of them. */
+  const pending = new Set<string>();
+
+  const confirmDlg = document.getElementById('confirm-stop') as HTMLDialogElement;
+  const confirmGo = document.getElementById('confirm-stop-go') as HTMLButtonElement;
+  const confirmCancel = document.getElementById('confirm-stop-cancel') as HTMLButtonElement;
+  const logDlg = document.getElementById('log-viewer') as HTMLDialogElement;
+  const logTitle = document.getElementById('lv-title')!;
+  const logMeta = document.getElementById('lv-meta')!;
+  const logBody = document.getElementById('lv-body') as HTMLPreElement;
+  const logRefresh = document.getElementById('lv-refresh') as HTMLButtonElement;
+  const logClose = document.getElementById('lv-close') as HTMLButtonElement;
+
+  function note(text: string, ok: boolean): void {
+    noteEl.textContent = text;
+    noteEl.dataset.state = ok ? 'ok' : 'err';
+  }
+
+  function busy(): boolean {
+    return pending.size > 0;
+  }
+
+  function actionBtn(
+    label: string,
+    key: string,
+    onClick: () => void,
+    disabled: boolean,
+  ): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn';
+    b.textContent = pending.has(key) ? '…' : label;
+    b.disabled = disabled || busy();
+    if (pending.has(key)) b.dataset.pending = 'true';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  /**
+   * Single-flight POST to a whitelisted action endpoint. On success it
+   * re-polls at once (the server invalidated its status cache). A lost
+   * response (e.g. the dashboard restarting itself) still re-polls.
+   */
+  async function runAction(
+    key: string,
+    path: string,
+    body: Record<string, unknown>,
+    successNote: string,
+  ): Promise<boolean> {
+    if (busy()) return false;
+    pending.add(key);
+    if (lastGood) render(lastGood);
+    try {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        note(data?.error ?? `action failed (HTTP ${res.status})`, false);
+        return false;
+      }
+      note(successNote, true);
+      return true;
+    } catch {
+      // The request died mid-flight (self-restart, tunnel drop): assume the
+      // worst is visible in the next poll, never leave a hanging spinner.
+      note('action response lost — re-polling status', false);
+      return false;
+    } finally {
+      pending.delete(key);
+      await poll();
+      if (lastGood) render(lastGood);
+    }
+  }
+
+  async function restartContainer(name: string): Promise<void> {
+    await runAction(
+      `restart:${name}`,
+      '/api/action/restart',
+      { container: name },
+      `restarted ${name}`,
+    );
+  }
+
+  async function stopPhase(project: string, confirm: boolean): Promise<void> {
+    await runAction(
+      `stop:${project}`,
+      '/api/action/stop-phase',
+      { project, confirm },
+      `stopped ${project}`,
+    );
+  }
+
+  async function startPhase(project: string): Promise<void> {
+    await runAction(`start:${project}`, '/api/action/start-phase', { project }, `started ${project}`);
+  }
+
+  /** Stop of a confirm-gated phase asks first; everything else runs. */
+  function requestStop(project: string): void {
+    if (STOP_CONFIRM_PROJECTS.includes(project)) {
+      confirmDlg.showModal();
+      return;
+    }
+    void stopPhase(project, false);
+  }
+
+  confirmGo.addEventListener('click', () => {
+    confirmDlg.close();
+    void stopPhase('hosting', true);
+  });
+  confirmCancel.addEventListener('click', () => confirmDlg.close());
+
+  /* ---- log viewer ------------------------------------------------------ */
+
+  let logTarget = '';
+
+  async function loadLogs(): Promise<void> {
+    logBody.textContent = 'loading…';
+    logRefresh.disabled = true;
+    try {
+      const res = await fetch(`/api/logs?container=${encodeURIComponent(logTarget)}&lines=200`, {
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = (await res.json()) as LogsResponse;
+      if (!res.ok || !data.ok) {
+        logBody.textContent = data.error ?? `logs failed (HTTP ${res.status})`;
+        return;
+      }
+      logMeta.textContent = `last ${data.logs?.length ?? 0} lines`;
+      logBody.textContent =
+        data.logs && data.logs.length > 0 ? data.logs.join('\n') : 'no log output';
+    } catch {
+      logBody.textContent = 'could not fetch logs';
+    } finally {
+      logRefresh.disabled = false;
+    }
+  }
+
+  function openLogs(name: string): void {
+    logTarget = name;
+    logTitle.textContent = `logs · ${name}`;
+    logMeta.textContent = '';
+    logDlg.showModal();
+    void loadLogs();
+  }
+
+  logRefresh.addEventListener('click', () => void loadLogs());
+  logClose.addEventListener('click', () => logDlg.close());
+
+  /* ---- status rendering -------------------------------------------------- */
 
   function timeOf(iso: string): string {
     return new Date(iso).toLocaleTimeString([], { hour12: false });
@@ -137,10 +313,31 @@ import '../styles/global.css';
       note.className = 'card__note';
       note.textContent = 'no containers found on this host';
       art.appendChild(note);
+      // Same action row as deployed phases, both disabled: nothing to stop
+      // or start (and the row keeps cards in one grid line level).
+      const acts = document.createElement('div');
+      acts.className = 'card__acts';
+      acts.append(
+        actionBtn('stop', `stop:${p.name}`, () => {}, true),
+        actionBtn('start', `start:${p.name}`, () => {}, true),
+      );
+      art.appendChild(acts);
       return art;
     }
 
     art.appendChild(strip(p.containers));
+
+    // phase lifecycle: start / stop (stop of `hosting` asks for a confirm)
+    const acts = document.createElement('div');
+    acts.className = 'card__acts';
+    const anyRunning = p.containers.some((c) => c.state === 'running');
+    const anyStopped = p.containers.some((c) => c.state !== 'running');
+    const stopBtn = actionBtn('stop', `stop:${p.name}`, () => requestStop(p.name), !anyRunning);
+    stopBtn.setAttribute('aria-label', `stop all containers in ${p.name}`);
+    const startBtn = actionBtn('start', `start:${p.name}`, () => void startPhase(p.name), !anyStopped);
+    startBtn.setAttribute('aria-label', `start all containers in ${p.name}`);
+    acts.append(stopBtn, startBtn);
+    art.appendChild(acts);
 
     const running = p.containers.filter((c) => c.state === 'running').length;
     const n = p.containers.length;
@@ -161,7 +358,15 @@ import '../styles/global.css';
       const meta = document.createElement('span');
       meta.className = 'crow__meta';
       meta.textContent = containerMeta(c);
-      li.append(dot, nm, meta);
+      // per-container actions: restart + logs
+      const rowActs = document.createElement('span');
+      rowActs.className = 'crow__acts';
+      const rb = actionBtn('restart', `restart:${c.name}`, () => void restartContainer(c.name), false);
+      rb.setAttribute('aria-label', `restart ${c.name}`);
+      const lb = actionBtn('logs', `logs:${c.name}`, () => openLogs(c.name), false);
+      lb.setAttribute('aria-label', `view last 200 log lines of ${c.name}`);
+      rowActs.append(rb, lb);
+      li.append(dot, nm, meta, rowActs);
       rows.appendChild(li);
     }
 
@@ -230,6 +435,7 @@ import '../styles/global.css';
         : 'connection lost — retrying';
     } finally {
       inFlight = false;
+      if (timer !== undefined) window.clearTimeout(timer);
       timer = window.setTimeout(poll, POLL_MS);
     }
   }

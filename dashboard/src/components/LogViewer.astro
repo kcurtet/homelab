@@ -1,0 +1,29 @@
+---
+// Overlay shells for the task-5 actions: the stop-hosting confirmation modal
+// and the container log viewer. Server-rendered once (native <dialog>s are
+// hidden until showModal), wired by the StatusGrid island script.
+---
+
+<dialog id="confirm-stop" class="modal" aria-labelledby="confirm-stop-title">
+  <h3 id="confirm-stop-title" class="modal__title">stop hosting?</h3>
+  <p class="modal__body">
+    this takes down public publishing — the site goes dark until the phase is
+    started again.
+  </p>
+  <div class="modal__row">
+    <button type="button" class="btn" id="confirm-stop-cancel">cancel</button>
+    <button type="button" class="btn btn--danger" id="confirm-stop-go">stop hosting</button>
+  </div>
+</dialog>
+
+<dialog id="log-viewer" class="lv" aria-labelledby="lv-title">
+  <div class="lv__head">
+    <h3 id="lv-title" class="lv__title">logs</h3>
+    <span id="lv-meta" class="lv__meta"></span>
+    <span class="lv__acts">
+      <button type="button" class="btn" id="lv-refresh">refresh</button>
+      <button type="button" class="btn" id="lv-close">close</button>
+    </span>
+  </div>
+  <pre id="lv-body" class="lv__body mono" tabindex="0"></pre>
+</dialog>

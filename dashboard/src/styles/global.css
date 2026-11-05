@@ -228,7 +228,7 @@ a {
   display: grid;
   gap: var(--gap);
   grid-template-columns: 1fr;
-  align-items: start;
+  /* default stretch: cards that share a row share a bottom edge */
 }
 
 @media (min-width: 680px) {
@@ -530,6 +530,181 @@ a {
 .hub__link:hover .hub__label,
 .hub__link:hover .hub__arrow {
   color: var(--accent);
+}
+
+/* ---- actions (task 5) -------------------------------------------------- */
+
+/* Ghost buttons: neutral chrome, colour stays on data. 32px hit area on
+   dense rows (the sheet's mode), full-width phase buttons reach 36px. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: #262a30;
+  color: var(--text);
+}
+
+.btn:disabled {
+  background: var(--raised);
+  /* still ≥4.5:1 on raised — a disabled control is dimmed, not unreadable */
+  color: #8a9099;
+  cursor: default;
+}
+
+.btn[data-pending='true'] {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* the one destructive control wears the down-tint language, not the accent */
+.btn--danger {
+  background: var(--pill-down-bg);
+  color: var(--pill-down-ink);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #3a2229;
+  color: #f598a8;
+}
+
+.card__acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.card__acts .btn {
+  min-height: 36px;
+  flex: 1 1 0;
+}
+
+.crow__acts {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+}
+
+.action-note {
+  margin: 12px 2px 0;
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.action-note[data-state='ok'] {
+  color: var(--pill-up-ink);
+}
+
+.action-note[data-state='err'] {
+  color: var(--pill-down-ink);
+}
+
+/* ---- dialogs (confirm modal, log viewer) -------------------------------- */
+
+dialog.modal,
+dialog.lv {
+  background: var(--surface);
+  color: var(--text);
+  border: 0;
+  border-radius: var(--radius-card);
+  padding: 0;
+}
+
+dialog.modal::backdrop,
+dialog.lv::backdrop {
+  background: rgba(5, 6, 7, 0.72);
+}
+
+dialog.modal {
+  width: min(92vw, 380px);
+  padding: var(--pad);
+}
+
+.modal__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.modal__body {
+  margin: 12px 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.modal__row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal__row .btn {
+  min-height: 36px;
+  padding: 6px 16px;
+}
+
+dialog.lv {
+  width: min(94vw, 880px);
+  max-height: min(84dvh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.lv__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px var(--pad);
+  border-bottom: 1px solid var(--rule-card);
+}
+
+.lv__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.lv__meta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.lv__acts {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.lv__body {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 14px var(--pad) 18px;
+  overflow: auto;
+  background: var(--ground);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
 }
 
 /* ---- footer ----------------------------------------------------------- */
