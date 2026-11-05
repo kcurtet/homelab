@@ -42,7 +42,7 @@ the shared home network comes last. Follow them in order.
 
 Each phase is self-contained in its directory and independently verifiable. Nothing
 touches the shared home network until Phase 3, and Phase 3 is only ever applied on the
-final Raspberry Pi host.
+final Raspberry Pi host (see the [arrival + retarget checklist](docs/runbooks/raspberry-arrival.md)).
 
 ## Repository layout
 
