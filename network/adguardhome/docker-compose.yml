@@ -1,0 +1,107 @@
+# AdGuard Home — network-wide DNS sinkhole with DHCP (OFF by default) and
+# automatic DNS failover to the house router.
+#
+# Validation status: `docker compose config` verified (syntax). Live bring-up is
+# deferred to the Raspberry era — see docs/runbooks/dhcp-migration.md and
+# progress.md. DHCP ships DISABLED (ADGUARD_DHCP_ENABLED=false in .env.example;
+# the seed written by ./generate-config.sh carries dhcp.enabled: false): the
+# seeded config must keep DHCP off before any `up`.
+#
+# CONFIGURATION MODEL (the big difference with the previous DNS phase):
+#   AdGuard Home is configured by /opt/adguardhome/conf/AdGuardHome.yaml, not
+#   by environment variables. The YAML is pre-seeded from .env by
+#   ./generate-config.sh (run it once before the first `up` — see the script's
+#   header for the documented trade-off vs the first-run wizard). The official
+#   Docker KB warns: the YAML can only be edited while the container is
+#   STOPPED — the running app overwrites concurrent edits
+#   (adguard-dns.io/kb/adguard-home/docker/).
+#
+# RESEARCH (AdGuard Home v0.107.80, checked 2026-11-06):
+#   - Image & tag: adguard/adguardhome:v0.107.80 — latest stable of the
+#     v0.107.x line at research time (Docker Hub tags API,
+#     hub.docker.com/v2/repositories/adguard/adguardhome/tags; 2026-11-03
+#     push). The v0.108.0-b.* / v1.0.0-b.* tags are the beta channel — do not
+#     pin those. Published for linux/amd64 AND linux/arm64 (also 386, arm/v6,
+#     arm/v7, ppc64le) — arm64 matters because the final home for this stack
+#     is a Raspberry Pi 5.
+#   - Image internals (github.com/AdguardTeam/AdGuardHome, docker/
+#     build.Dockerfile): FROM alpine:3.23 → busybox applets (nslookup, wget)
+#     are available, `dig` is NOT. Runs as root (no USER directive); the
+#     binary carries setcap cap_net_bind_service. No HEALTHCHECK shipped in
+#     the image — the one below is ours.
+#   - DHCP + host networking: official Docker KB
+#     (adguard-dns.io/kb/adguard-home/docker/): "To use AdGuard Home's DHCP
+#     server, the --network host argument should be passed" (Linux only);
+#     with host networking, port mapping is not used (ports: is mutually
+#     exclusive with network_mode: host anyway).
+#   - Capabilities: the official quick-start docker run does NOT add any
+#     capability. The container runs as root, so the default capability set
+#     (including NET_BIND_SERVICE and NET_ADMIN) is already present — DHCP
+#     needs no extra grant. Verified against the KB page; no cap_add here.
+#   - Healthcheck: the KB recommends probing the special domain
+#     healthcheck.adguardhome.test, which AdGuard Home always answers locally
+#     with a NODATA response (no upstream dependency). Verified live against
+#     v0.107.80: `nslookup healthcheck.adguardhome.test 127.0.0.1` (busybox
+#     applet) exits 0 while DNS is up and 1 on connection refused.
+#   - schema_version: 34 is what v0.107.80 expects (written by the seed
+#     script). Verified live: without it, the app runs its config migrator
+#     from the oldest schema and silently drops the dhcpv4 section.
+#
+# DNS FAILOVER DESIGN (spec "Improvements over the article" #1 — replaces the
+# old fallback-Wi-Fi "apaño"):
+#   AdGuard Home's DHCP leases advertise DNS1 = this host and DNS2 = the
+#   router via dhcp.dhcpv4.options, option 6 with type `ips`
+#   (github.com/AdguardTeam/AdGuardHome/wiki/DHCP, up-to-date mirror at
+#   adguard-dns.io/kb/adguard-home/dhcp/):
+#       options:
+#         - 6 ips <host LAN IP>,<router IP>
+#   Unlike dnsmasq's 0.0.0.0 "this machine" trick, AdGuard Home has no
+#   self-referencing placeholder for option 6: the host's LITERAL LAN IP must
+#   be baked in (ADGUARD_HOST_IP in .env — the seed script wires it). The
+#   official DHCP docs warn that when defining option 6 you MUST also include
+#   AdGuard Home's own address, or DHCP clients will bypass its filtering —
+#   the seed puts it first (DNS1), the router second (DNS2).
+#   Result: AdGuard Home down -> clients keep resolving through the router
+#   alone -> the household keeps internet (ads return until it is back).
+#   Nobody switches SSIDs, nobody calls the helpdesk.
+#   ACCEPTED TRADE-OFF (documented, not a bug): some clients occasionally use
+#   DNS2 in normal operation and see unblocked ads. See the mandatory section
+#   in docs/runbooks/dhcp-migration.md.
+name: network
+
+services:
+  adguardhome:
+    # Pinned to the latest stable v0.107.x tag at research time (Docker Hub,
+    # 2026-11-06). Published for amd64 and arm64 — arm64 matters because the
+    # final home for this stack is a Raspberry Pi 5.
+    image: adguard/adguardhome:v0.107.80
+    container_name: adguardhome
+    restart: unless-stopped
+
+    # DHCP works over broadcast, which docker's bridge cannot relay — host
+    # networking makes the container share the host's LAN interface (official
+    # requirement, see RESEARCH above). It also lets DNS (53) and the web UI
+    # answer directly on the host IP without port mappings.
+    network_mode: host
+
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+
+    volumes:
+      # All runtime state under ./data/ (gitignored via **/data/) so moving
+      # the lab to the Raspberry is copy + rerun. The config volume is the
+      # seeded AdGuardHome.yaml (./generate-config.sh, first boot only);
+      # the work volume holds query logs, stats, leases and filter caches.
+      - ./data/conf:/opt/adguardhome/conf
+      - ./data/work:/opt/adguardhome/work
+
+    # No HEALTHCHECK in the official image (alpine base, dig absent). Probe
+    # the special healthcheck.adguardhome.test domain through the local DNS
+    # server — verified live, see RESEARCH above. Port 53 is dns.port's
+    # default (we never change it).
+    healthcheck:
+      test: ["CMD", "nslookup", "healthcheck.adguardhome.test", "127.0.0.1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
