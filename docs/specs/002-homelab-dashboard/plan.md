@@ -12,7 +12,7 @@
 
 ## Restricciones globales
 
-- Fase = label `com.docker.compose.project`: `hosting` (coolify+cloudflare), `network` (pihole), `dashboard`.
+- Fase = label `com.docker.compose.project`: `hosting` (coolify+cloudflare), `network` (adguardhome), `dashboard`.
 - Anti-objetivos spec: sin exec arbitrario, sin 0.0.0.0 público (publish solo `127.0.0.1:`), sin socket crudo.
 - Stop de `hosting` exige confirmación explícita (caída de publicación pública).
 - En lynx `docker` = podman: validaciones locales contra el socket de podman (`unix:///run/user/1000/podman/podman.sock`).
@@ -31,7 +31,7 @@
 ### Tarea 1: Renaming de proyectos compose
 
 **Ficheros:**
-- Modificar: `hosting/coolify/docker-compose.yml`, `hosting/cloudflare/docker-compose.yml` (→ `name: hosting`), `network/pihole/docker-compose.yml` (→ `name: network`)
+- Modificar: `hosting/coolify/docker-compose.yml`, `hosting/cloudflare/docker-compose.yml` (→ `name: hosting`), `network/adguardhome/docker-compose.yml` (→ `name: network`)
 - Modificar: `docs/runbooks/hosting.md`, `docs/runbooks/dhcp-migration.md` (nota: project name)
 
 **Interfaces:**
@@ -74,7 +74,7 @@
 ### Tarea 4: UI — tarjetas, hub, polling
 
 **Ficheros:**
-- Crear: `dashboard/src/layouts/Base.astro`, `dashboard/src/components/StatusGrid.*` (isla con polling 10s), `dashboard/src/components/HubLinks.astro`, `dashboard/src/styles/global.css` (tokens ops oscuro), ampliar `.env.example` (`HUB_COOLIFY_URL`, `HUB_PIHOLE_URL`, `HUB_TAILSCALE_URL`)
+- Crear: `dashboard/src/layouts/Base.astro`, `dashboard/src/components/StatusGrid.*` (isla con polling 10s), `dashboard/src/components/HubLinks.astro`, `dashboard/src/styles/global.css` (tokens ops oscuro), ampliar `.env.example` (`HUB_COOLIFY_URL`, `HUB_ADGUARD_URL`, `HUB_TAILSCALE_URL`)
 
 Nota: ejecutar con la skill `design-taste-frontend` cargada — es pantalla de app real del portfolio.
 

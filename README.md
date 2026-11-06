@@ -1,6 +1,6 @@
 # Homelab
 
-Reproducible home lab: Pi-hole as house DNS/DHCP with automatic failover, Coolify
+Reproducible home lab: AdGuard Home as house DNS/DHCP with automatic failover, Coolify
 self-hosted PaaS published through a Cloudflare Tunnel, Tailscale remote access, and
 restic backups to USB. Every phase is plain Docker Compose + runbooks.
 
@@ -37,17 +37,21 @@ Join the tailnet, SSH over the mesh, optionally advertise the LAN as a subnet
 route: [remote-access/tailscale.md](remote-access/tailscale.md).
 Wake-on-LAN sender (educational): [remote-access/wol/wol.md](remote-access/wol/wol.md).
 
-### 3. DNS/DHCP — Pi-hole
+### 3. DNS/DHCP — AdGuard Home
 
 > **Final always-on hardware only.** Never on a laptop or temporary host: taking
 > over DHCP affects every device on the network. DHCP ships **disabled by default**.
 
 ```bash
-cd network/pihole
-cp .env.example .env        # ranges, router IP, then follow the migration runbook
+cd network/adguardhome
+cp .env.example .env        # ranges, router IP, web password hash
+docker run --rm httpd:2-alpine htpasswd -B -C 10 -n admin 'your-password' | cut -d: -f2
+                            # ^ paste into .env as ADGUARD_PASSWORD_HASH
+./generate-config.sh        # seed data/conf/AdGuardHome.yaml (first boot only)
+docker compose up -d
 ```
 
-Full migration order (verify router DNS → Pi-hole DHCP on → router DHCP off →
+Full migration order (verify router DNS → AdGuard Home DHCP on → router DHCP off →
 per-device checks) and rollback: [docs/runbooks/dhcp-migration.md](docs/runbooks/dhcp-migration.md).
 
 ### 4. Backups — restic
@@ -72,7 +76,7 @@ Quick checks after install (details in each runbook):
 
 ```bash
 docker compose config -q                       # in every compose dir: exit 0
-dig @<host> example.com                        # Pi-hole answers (phase 3)
+dig @<host> example.com                        # AdGuard Home answers (phase 3)
 tailscale ping <node>                          # mesh reachable (phase 2)
 sudo systemctl list-timers homelab-backup.*    # timer scheduled (phase 4)
 curl -s http://127.0.0.1:4321/api/status        # dashboard answers (phase 5)
@@ -83,7 +87,7 @@ curl -s http://127.0.0.1:4321/api/status        # dashboard answers (phase 5)
 ```
 hosting/        # coolify/ and cloudflare/ compose (Phase 1)
 remote-access/  # tailscale.md + wol/ script (Phase 2)
-network/        # pihole/ compose + .env.example (Phase 3)
+network/        # adguardhome/ compose + .env.example + config seed (Phase 3)
 backup/         # restic scripts + systemd units (Phase 4)
 dashboard/      # astro status+actions UI, tailscale-only (Phase 5)
 docs/           # topology, runbooks, status

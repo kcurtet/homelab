@@ -6,7 +6,7 @@
 
 **Arquitectura:** Repo con un directorio por concern (`hosting/`, `remote-access/`, `network/`, `backup/`, `docs/runbooks/`). Cada fase es autocontenida (móvil con copy+rerun) y se valida en el host que toque antes de declararse hecha. Nada de la red de casa se aplica hasta la era Raspberry.
 
-**Stack:** Docker Compose, Coolify, Pi-hole v6, cloudflared, Tailscale, restic, bash, systemd timers.
+**Stack:** Docker Compose, Coolify, AdGuard Home, cloudflared, Tailscale, restic, bash, systemd timers.
 
 **Spec:** `docs/specs/001-homelab-rebuild/spec.md` — el plan argumenta desde ella.
 
@@ -15,14 +15,14 @@
 - Docs en inglés; artículo original enlazado como origin story.
 - Público en GitHub: cero secretos/MACs familiares/IPs de casa reales → solo `.env` (gitignored) + `.env.example`.
 - `.gitignore` cubre `.env` y `**/data/` ANTES de que exista cualquier `.env` o dato runtime.
-- Pi-hole compose arranca con **DHCP desactivado por defecto** (`PIHOLE_DHCP_ACTIVE=false` en `.env.example`); activarlo es paso manual de la era Raspberry.
+- AdGuard Home arranca con **DHCP desactivado por defecto** (`ADGUARD_DHCP_ENABLED=false` en `.env.example`; el seed `generate-config.sh` lo plasma como `dhcp.enabled: false`); activarlo es paso manual de la era Raspberry.
 - Fase 3 nunca se aplica fuera de la Raspberry; fase 1 sí se valida en panther.
 - Cada tarea termina en commit; mensajes en inglés, conventional style (`feat:`, `docs:`, `chore:`).
 
 ## Foco de revisión
 
 1. **Secreto commiteado** → `.gitignore` + `git check-ignore` verificado en Tarea 1 antes de crear nada más.
-2. **Pi-hole secuestra el DHCP de casa por accidente** → default DHCP-off en compose (T6: `docker compose config` muestra la flag off).
+2. **AdGuard Home secuestra el DHCP de casa por accidente** → default DHCP-off en el seed (T6: `grep dhcp data/conf/AdGuardHome.yaml` muestra `enabled: false`).
 3. **Compose de Coolify desalineado del instalador oficial** → T3 fija versión y compara contra el instalador oficial.
 4. **Backups sin restore verificado** → T8 exige restore real de un fichero de prueba (la spec lo llama decoración si no).
 5. **Failover DNS sin documentar el trade-off de fugas de anuncios** → T7 incluye sección explícita y su verificación es de revisión de doc.
@@ -40,7 +40,7 @@
 
 - [ ] **Paso 1: crear `.gitignore`** con: `.env`, `**/data/`, `**/.restic-cache/`
 - [ ] **Paso 2: verificar que cubre** — Run: `git check-ignore -v fixtures.env 2>/dev/null; mkdir -p /tmp/x && git check-ignore hosting/data` — Expected: rutas ignoradas (probar con ficheros temporales `.env` y `x/data/f` en el árbol)
-- [ ] **Paso 3: escribir `README.md`** — qué es este lab, link al artículo, diagrama de topología (Mermaid en `docs/topology.md`: internet ↔ router (DNS2/respaldo) ↔ Pi (Pi-hole DNS1+DHCP, Coolify, restic, Tailscale subnet router, WoL sender) ↔ familia/dispositivos; staging: panther), índice de fases con orden recomendado y "what each teaches".
+- [ ] **Paso 3: escribir `README.md`** — qué es este lab, link al artículo, diagrama de topología (Mermaid en `docs/topology.md`: internet ↔ router (DNS2/respaldo) ↔ Pi (AdGuard Home DNS1+DHCP, Coolify, restic, Tailscale subnet router, WoL sender) ↔ familia/dispositivos; staging: panther), índice de fases con orden recomendado y "what each teaches".
 - [ ] **Paso 4: LICENSE MIT** con copyright `Kevin Curtet`
 - [ ] **Paso 5: verificar** — Run: `ls` muestra los 5 directorios; README renderiza (revisión visual de secciones: intro, topology link, phase index).
 - [ ] **Paso 6: commit** `chore: repo skeleton, gitignore, MIT license, README with topology`
@@ -101,20 +101,20 @@
 - [ ] **Paso 5: escribir `wol.md`** — prerrequisitos (UEFI: WoL enabled; Linux: `ethtool -s iface wol g` persistente), por qué el emisor debe ser host encendido con cable, y etiqueta **EDUCATIONAL** (sin objetivo verificable hoy).
 - [ ] **Paso 6: commit** `feat: remote access docs (tailscale) + educational wol script`
 
-### Tarea 6: Pi-hole — compose con failover DNS
+### Tarea 6: AdGuard Home — compose con failover DNS
 
 **Ficheros:**
-- Crear: `network/pihole/docker-compose.yml`, `network/pihole/.env.example`, `docs/runbooks/dhcp-migration.md`
+- Crear: `network/adguardhome/docker-compose.yml`, `network/adguardhome/.env.example`, `network/adguardhome/generate-config.sh`, `docs/runbooks/dhcp-migration.md`
 
 **Interfaces:**
-- Produce: Pi-hole v6 con DHCP **off por defecto**; variables para rango DHCP y DNS2=router; runbook de migración con rollback.
+- Produce: AdGuard Home con DHCP **off por defecto**; variables para rango DHCP y DNS2=router; seed reproducible del YAML; runbook de migración con rollback.
 
-- [ ] **Paso 1: `.env.example`** — `PIHOLE_DHCP_ACTIVE=false`, `PIHOLE_DHCP_START/END`, `PIHOLE_DHCP_ROUTER`, `PIHOLE_DNS2_ROUTER=192.168.1.1`, `FTLCONF_dns_listening_mode`, TZ.
-- [ ] **Paso 2: compose** — Pi-hole v6, `network_mode: host` (DHCP), `cap_add: NET_ADMIN`, volúmenes bajo `./data/`, `FTLCONF_` mapeadas desde env, healthcheck `dig`.
-- [ ] **Paso 3: validar default seguro** — Run: `cd network/pihole && cp .env.example .env && docker compose config | grep -i dhcp` — Expected: flag DHCP inactiva en la configuración renderizada.
-- [ ] **Paso 4: validar live SIN tocar la red** — levantar en panther con DHCP off: resuelve (`dig @localhost pi.hole` / `dig @localhost example.com`) y luego `down -v`. Nunca activar DHCP aquí.
-- [ ] **Paso 5: `dhcp-migration.md`** — prerequisito: verificar que el router responde DNS como secundario (`dig @192.168.1.1 example.com`); orden: Pi-hole DHCP ON → verificar leases+DNS1/DNS2 en un cliente → router DHCP OFF → verificación por dispositivo; rollback: router DHCP ON de nuevo + renovar leases. Sección obligatoria: trade-off de fuga de anuncios cuando algún cliente usa DNS2.
-- [ ] **Paso 6: commit** `feat: pihole v6 compose (dhcp-off default, dns failover) + migration runbook`
+- [ ] **Paso 1: `.env.example`** — `ADGUARD_DHCP_ENABLED=false`, `ADGUARD_DHCP_START/END`, `ADGUARD_DHCP_GATEWAY`, `ADGUARD_DNS2_ROUTER=192.168.1.1`, `ADGUARD_HOST_IP` (IP literal del host para la option 6), hash bcrypt de la contraseña web, TZ.
+- [ ] **Paso 2: compose + generador** — imagen `adguard/adguardhome` pinnada a tag estable multi-arch (amd64+arm64), `network_mode: host` (DHCP), volúmenes `./data/conf` y `./data/work`, `generate-config.sh` siembra `AdGuardHome.yaml` desde `.env` (hash heredoc, sin dependencias), healthcheck con `nslookup healthcheck.adguardhome.test`.
+- [ ] **Paso 3: validar default seguro** — Run: `cd network/adguardhome && cp .env.example .env && ./generate-config.sh && grep -A1 '^dhcp:' data/conf/AdGuardHome.yaml` — Expected: `enabled: false` en el seed.
+- [ ] **Paso 4: validar live SIN tocar la red** — levantar en panther con DHCP off: resuelve (`dig @localhost example.com`) y luego `down -v`. Nunca activar DHCP aquí.
+- [ ] **Paso 5: `dhcp-migration.md`** — prerequisito: verificar que el router responde DNS como secundario (`dig @192.168.1.1 example.com`); orden: AdGuard Home DHCP ON → verificar leases+DNS1/DNS2 en un cliente → router DHCP OFF → verificación por dispositivo; rollback: router DHCP ON de nuevo + renovar leases. Sección obligatoria: trade-off de fuga de anuncios cuando algún cliente usa DNS2.
+- [ ] **Paso 6: commit** `feat: adguard home compose (dhcp-off default, dns failover) + migration runbook`
 
 ### Tarea 7: Backups restic
 
@@ -122,7 +122,7 @@
 - Crear: `backup/restic/backup.sh`, `backup/restic/forget.sh`, `backup/restic/homelab-backup.service`, `backup/restic/homelab-backup.timer`, `backup/.env.example`, `backup/README.md`
 
 **Interfaces:**
-- Produce: snapshots de `hosting/coolify/data/` + config Pi-hole + repo + `/home` del host; política forget 7d/4w/6m; runbook de restore.
+- Produce: snapshots de `hosting/coolify/data/` + config AdGuard Home + repo + `/home` del host; política forget 7d/4w/6m; runbook de restore.
 
 - [ ] **Paso 1: `.env.example`** — `RESTIC_REPOSITORY=/mnt/backup/homelab.restic` (staging: dir local en panther), `RESTIC_PASSWORD_FILE=/etc/homelab/restic.pass` (chmod 600), `BACKUP_PATHS` (las 4 fuentes).
 - [ ] **Paso 2: `backup.sh`** — `set -euo pipefail`; carga `.env`; `restic backup $BACKUP_PATHS`; `forget.sh`: `restic forget --prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6`.
@@ -141,7 +141,7 @@
 **Interfaces:**
 - Consume: todos los runbooks anteriores (T3–T7).
 
-- [ ] **Paso 1: checklist** — verificar hardware (Pi 5 8 GB, SSD detectado), instalar Pi OS 64-bit en SSD, Docker (→ T2), retarget fase a fase (hosting: copiar `hosting/coolify/data/` y `up -d`; tailscale subnet router; pihole SOLO aquí + migración DHCP → T6; backups: conectar USB, unidades systemd). Punto de decisión documentado: si la Pi llega rota/inferior, Coolify se queda en panther y la Pi toma DNS+backups.
+- [ ] **Paso 1: checklist** — verificar hardware (Pi 5 8 GB, SSD detectado), instalar Pi OS 64-bit en SSD, Docker (→ T2), retarget fase a fase (hosting: copiar `hosting/coolify/data/` y `up -d`; tailscale subnet router; adguardhome SOLO aquí + migración DHCP → T6; backups: conectar USB, unidades systemd). Punto de decisión documentado: si la Pi llega rota/inferior, Coolify se queda en panther y la Pi toma DNS+backups.
 - [ ] **Paso 2: commit** `docs: raspberry arrival + retarget checklist`
 
 ### Tarea 9: Publicación

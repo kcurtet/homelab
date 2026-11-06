@@ -2,7 +2,7 @@
 
 ## Context and intent
 
-The public site [kcurtet.com/proyectos/homelab](https://kcurtet.com/proyectos/homelab/) describes a real home lab: Pi-hole as house-wide DNS+DHCP, Tailscale + Wake-on-LAN for remote access, Coolify/Dokku hosting published through a Cloudflare Tunnel with Let's Encrypt certs, and backups to an old USB disk. That setup must now be rebuilt as a **reproducible, public GitHub repo** (`kcurtet/homelab`): compose files + scripts + documentation that explain the *why* of each decision. The repo doubles as portfolio material for an IT-support job search.
+The public site [kcurtet.com/proyectos/homelab](https://kcurtet.com/proyectos/homelab/) describes a real home lab: AdGuard Home as house-wide DNS+DHCP, Tailscale + Wake-on-LAN for remote access, Coolify/Dokku hosting published through a Cloudflare Tunnel with Let's Encrypt certs, and backups to an old USB disk. That setup must now be rebuilt as a **reproducible, public GitHub repo** (`kcurtet/homelab`): compose files + scripts + documentation that explain the *why* of each decision. The repo doubles as portfolio material for an IT-support job search.
 
 This rebuild is not a literal copy: known weak points of the original are replaced by better designs (see "Improvements over the article").
 
@@ -16,11 +16,11 @@ Existing assets: a live Tailscale tailnet (`<your-tailnet>.ts.net`) with `panthe
 
 ## Improvements over the article
 
-The original design's fallback for "Pi-hole is down" was a second Wi-Fi SSID that bypassed it — a manual workaround ("apaño") that also required family members to switch networks. It is **dropped**. This router cannot provide a second SSID on the LAN anyway (guest network has client isolation).
+The original design's fallback for "AdGuard Home is down" was a second Wi-Fi SSID that bypassed it — a manual workaround ("apaño") that also required family members to switch networks. It is **dropped**. This router cannot provide a second SSID on the LAN anyway (guest network has client isolation).
 
 Replacements applied in this rebuild:
 
-1. **Automatic DNS failover instead of fallback Wi-Fi.** Pi-hole's DHCP hands out Pi-hole as primary DNS and the router as secondary. If Pi-hole dies, clients fail over by themselves; the household keeps internet (ads return until fixed). Nobody switches anything, nobody waits for the helpdesk. Trade-off documented: some clients occasionally use the secondary resolver, leaking ads; acceptable.
+1. **Automatic DNS failover instead of fallback Wi-Fi.** AdGuard Home's DHCP hands out AdGuard Home as primary DNS and the router as secondary (DHCP option 6, seeded into `AdGuardHome.yaml`). If AdGuard Home dies, clients fail over by themselves; the household keeps internet (ads return until fixed). Nobody switches anything, nobody waits for the helpdesk. Trade-off documented: some clients occasionally use the secondary resolver, leaking ads; acceptable.
 2. **Wake-on-LAN demoted to educational.** All current machines are laptops (panther reached over Wi-Fi), so WoL has no verifiable target today. The script and docs remain as a learning piece, clearly labeled, not as a operated feature.
 
 ## Objectives
@@ -68,13 +68,13 @@ Phase order is by blast radius: things that only touch disposable hosts first, t
 
 ### Phase 3 — House DNS/DHCP (Raspberry era)
 
-- `network/pihole/docker-compose.yml`: Pi-hole v6 with DHCP enabled (ranges, lease times as `.env`), host networking or port 67 mapped, `FTLCONF_` settings externalized.
-- **DNS failover design**: DHCP advertises Pi-hole as DNS1 and the router as DNS2. Verify ad-blocking still routes through Pi-hole in the normal case; document the ad-leak trade-off during failover.
-- `docs/runbooks/dhcp-migration.md`: order of operations — verify router answers DNS as secondary → enable Pi-hole DHCP → disable router DHCP → per-device verification. Includes the rollback path (re-enable router DHCP, clients re-lease).
+- `network/adguardhome/`: AdGuard Home with DHCP enabled (ranges, lease times as `.env`), host networking for DHCP broadcasts. Config is YAML-driven (no env-var configuration): a committed generator (`generate-config.sh`) seeds `AdGuardHome.yaml` from `.env` for reproducible first boots.
+- **DNS failover design**: DHCP advertises AdGuard Home as DNS1 and the router as DNS2 (option 6 with the host's literal LAN IP — no self-referencing placeholder). Verify ad-blocking still routes through AdGuard Home in the normal case; document the ad-leak trade-off during failover.
+- `docs/runbooks/dhcp-migration.md`: order of operations — verify router answers DNS as secondary → enable AdGuard Home DHCP → disable router DHCP → per-device verification. Includes the rollback path (re-enable router DHCP, clients re-lease).
 
 ### Phase 4 — Backups
 
-- **Scope**: lab state (`hosting/coolify/data/`, Pi-hole config, the repo itself) **plus** `/home` of the server. Nothing else — no rootfs imaging.
+- **Scope**: lab state (`hosting/coolify/data/`, AdGuard Home config, the repo itself) **plus** `/home` of the server. Nothing else — no rootfs imaging.
 - `backup/restic/`: systemd service + timer (or cron script) snapshots to a mounted USB disk, password via `.env`/file with `chmod 600`; `forget --prune` policy (e.g. keep 7 daily / 4 weekly / 6 monthly); `backup/README.md` with the restore runbook — a backup without a tested restore is decoration.
 - Timer runs on whichever host holds the data: panther during staging, the Raspberry in the end state. The USB disk travels with it.
 
@@ -85,13 +85,13 @@ Given/When/Then per phase, verified on the real target before the phase is calle
 - **P0**: Given a fresh clone, When I read README alone, Then I know what this lab is, its topology, and which phase to start with.
 - **P1**: Given panther with Docker installed, When I follow `hosting.md`, Then Coolify is up, a sample site deploys via git push, and `docker compose down -v` removes all compose traces. Cloudflare section stays clearly "pending account".
 - **P2**: Given `.env` with a MAC, When I run `remote-access/wol/wake`, Then the script emits the packet and exits 0, with docs noting no wake is expected (educational). Tailscale doc verified against the live tailnet.
-- **P3**: Given the Raspberry on the LAN, When the migration runbook is followed, Then clients get IPs+DNS from Pi-hole, the router resolves as secondary, and stopping the Pi-hole container leaves clients with working internet (ads back) within one lease/DNS retry. Until then this phase is docs+compose only, never applied.
+- **P3**: Given the Raspberry on the LAN, When the migration runbook is followed, Then clients get IPs+DNS from AdGuard Home, the router resolves as secondary, and stopping the adguardhome container leaves clients with working internet (ads back) within one lease/DNS retry. Until then this phase is docs+compose only, never applied.
 - **P4**: Given the USB disk mounted, When the timer fires, Then a restic snapshot of lab state + `/home` lands, `restic snapshots` lists it, and a test file restores to a temp dir.
 
 ## Edge cases
 
-- Two DHCP servers alive at once (router + Pi-hole) during migration → runbook treats this as the dangerous window, steps ordered to minimize it.
-- Pi-hole down → clients fail over to router DNS automatically; family sees ads, not an outage. Documented symptom-to-fix map for the helpdesk (me).
+- Two DHCP servers alive at once (router + AdGuard Home) during migration → runbook treats this as the dangerous window, steps ordered to minimize it.
+- AdGuard Home down → clients fail over to router DNS automatically; family sees ads, not an outage. Documented symptom-to-fix map for the helpdesk (me).
 - Occasional use of the secondary resolver leaks ads in normal operation → documented trade-off of the failover design; not a bug.
 - panther is temporary: every phase's state must live in its own directory/volume so retargeting to the Raspberry is copy + rerun, not archaeology.
 - Pi underdelivers or arrives broken → Coolify may stay on panther and the Pi takes only DNS+backups; decision point written into the Raspberry arrival checklist.
@@ -104,13 +104,13 @@ Given/When/Then per phase, verified on the real target before the phase is calle
 - restic for backups; scope = lab state + `/home` of the server.
 - Repo name `homelab`, remote `github.com/kcurtet/homelab`.
 - Phased rollout, home network last.
-- Fallback Wi-Fi dropped; automatic DNS failover via DHCP (Pi-hole primary, router secondary) replaces it.
+- Fallback Wi-Fi dropped; automatic DNS failover via DHCP (AdGuard Home primary, router secondary) replaces it.
 - WoL kept as educational script/docs only.
 - Raspberry Pi 5 8 GB + SSD, confirmed by user. Plan tolerates a weaker Pi only as contingency (see edge cases).
 
 ## Left to the builder
 
 - Exact Coolify compose shape (pin to the official installer's versions).
-- Pi-hole v6 config keys, DHCP option syntax, and how to advertise DNS2 = router.
+- AdGuard Home config schema, DHCP option syntax, and how to advertise DNS2 = router.
 - restic timer unit specifics and USB mount convention (`/mnt/backup` suggested).
 - Whether `wol` uses `wakeonlan` or `ether-wake` (availability on Arch/CachyOS).

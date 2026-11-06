@@ -16,7 +16,7 @@
 4. Partitioning: **Guided — use entire disk**, all files in one partition (ext4). Swap as offered.
 5. Network (if not offered automatically, configure manually when the installer reaches the mirror step):
    - IP: `192.168.1.100/24`, gateway `192.168.1.1`
-   - DNS: `192.168.1.1` (the router — this is intentional: Pi-hole does not exist yet, and when it does, this host should still resolve even if Pi-hole is down)
+   - DNS: `192.168.1.1` (the router — this is intentional: AdGuard Home does not exist yet, and when it does, this host should still resolve even if AdGuard Home is down)
 6. Package selection (tasksel): **SSH server + standard system utilities**. Nothing else — no desktop.
 7. GRUB to the primary disk (the NVMe, not the external USB data disk).
 

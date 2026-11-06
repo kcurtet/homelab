@@ -9,8 +9,8 @@ and the key design decision that fixes the original setup's single point of fail
 flowchart TD
     IN(("Internet"))
     R["Home router<br/>DNS2 — fallback resolver"]
-    PI["Raspberry Pi 5 — final server<br/>• Pi-hole: DNS1 + DHCP<br/>• Coolify: hosting<br/>• restic: backups → USB disk<br/>• Tailscale subnet router<br/>• Wake-on-LAN sender"]
-    F["Household devices<br/>DNS1 = Pi-hole · DNS2 = router"]
+    PI["Raspberry Pi 5 — final server<br/>• AdGuard Home: DNS1 + DHCP<br/>• Coolify: hosting<br/>• restic: backups → USB disk<br/>• Tailscale subnet router<br/>• Wake-on-LAN sender"]
+    F["Household devices<br/>DNS1 = AdGuard Home · DNS2 = router"]
 
     IN <-- "WAN" --> R
     R <-- "LAN / Wi-Fi" --> PI
@@ -20,7 +20,8 @@ flowchart TD
 ```
 
 All traffic to and from the internet flows through the router. The Raspberry Pi
-provides DNS (Pi-hole) and DHCP for the whole house, hosts services on Coolify, and
+provides DNS (AdGuard Home) and DHCP for the whole house, hosts services on Coolify,
+and
 keeps them backed up with restic. Remote access is Tailscale only — the router never
 opens a port. Cloudflare Tunnel publishes public services without exposing the home IP.
 
@@ -47,14 +48,14 @@ panther to the Raspberry Pi is *copy + re-run*, not archaeology.
 
 ## Key improvement: automatic DNS failover
 
-The original setup had no answer to "Pi-hole is down": Pi-hole was the only DNS
-handed out by DHCP, so if it died the whole house lost name resolution until I fixed
-it. This design removes that single point of failure with automatic failover:
+The original setup had no answer to "AdGuard Home is down": AdGuard Home was the
+only DNS handed out by DHCP, so if it died the whole house lost name resolution until
+I fixed it. This design removes that single point of failure with automatic failover:
 
-- Pi-hole's DHCP advertises **Pi-hole as DNS1** and **the router as DNS2**.
-- If Pi-hole dies, clients fail over to the router on their own. The household keeps
-  internet — ads return until Pi-hole is fixed, but nobody switches anything and
-  nobody waits for the helpdesk.
+- AdGuard Home's DHCP advertises **AdGuard Home as DNS1** and **the router as DNS2**.
+- If AdGuard Home dies, clients fail over to the router on their own. The household
+  keeps internet — ads return until AdGuard Home is fixed, but nobody switches
+  anything and nobody waits for the helpdesk.
 
 **Trade-off (accepted):** some clients occasionally query the secondary resolver even
 in normal operation, which leaks some ads. That is the documented cost of the design,
@@ -67,7 +68,7 @@ failover has been verified — see `network/` and `docs/runbooks/dhcp-migration.
 
 The lab was first built and documented by hand in
 [Reconstruyendo mi homelab: autohospedaje de cero](https://kcurtet.com/proyectos/homelab/)
-(Spanish). That article is the origin story: Pi-hole as house-wide DNS+DHCP, Tailscale +
+(Spanish). That article is the origin story: AdGuard Home as house-wide DNS+DHCP, Tailscale +
 Wake-on-LAN for remote access, Coolify hosting published through a Cloudflare Tunnel,
 and restic backups to an old USB disk.
 

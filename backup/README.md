@@ -12,7 +12,7 @@ running the timer** — nothing else.
 | Source | What it is | Notes |
 |---|---|---|
 | `hosting/coolify/data/` | Coolify state: apps, deployments, webhooks | The lab's crown jewels |
-| `network/pihole/data/` | Pi-hole config | Raspberry era; tiny (or absent) until then |
+| `network/adguardhome/data/` | AdGuard Home config + state | Raspberry era; tiny (or absent) until then |
 | `.` (this repo) | The lab definition itself | Infrastructure as code |
 | `/home` | Home dirs of the backup host | The irreplaceable part |
 

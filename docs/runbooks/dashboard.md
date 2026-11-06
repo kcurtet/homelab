@@ -13,7 +13,7 @@ through a socket-proxy — no SSH, no systemd, no exec endpoints — and it is r
   (CONTAINERS/LOGS/NETWORKS/VOLUMES/IMAGES/INFO/PING + POST for lifecycle). Exec and
   build endpoints are not granted. The raw docker socket is never mounted into the
   dashboard.
-- Phases = compose projects: `hosting` (coolify + cloudflared), `network` (pihole),
+- Phases = compose projects: `hosting` (coolify + cloudflared), `network` (adguardhome),
   `dashboard`. Start/stop works on running containers' labels; it does not create.
 - Manual backup runs `backup/restic/backup.sh` **as-is** inside an ephemeral container
   (same env file and mounts as the host timer — identical scope by construction).
@@ -26,7 +26,7 @@ On the lab host (Docker path in `docker-host.md`):
 
 ```bash
 cd dashboard
-cp .env.example .env        # port + hub URLs (+ Pi-hole API token if wanted)
+cp .env.example .env        # port + hub URLs (+ AdGuard Home API creds if wanted)
 
 # The backup button needs the runner image (podman tags it localhost/…, the
 # dashboard's default; on Docker, tag without localhost/ and set
@@ -63,7 +63,7 @@ own certificate — from any device in the tailnet, nowhere else.
 ## Verify
 
 1. **Status**: open the dashboard — cards should reflect `docker ps` on the host.
-2. **Hub links** resolve to Coolify/Pi-hole/Tailscale admin.
+2. **Hub links** resolve to Coolify/AdGuard Home/Tailscale admin.
 3. **Action**: restart a container from its row; `StartedAt` should change.
 4. **Guardrail**: stop `hosting` → a confirm dialog warns "this takes down public
    publishing"; the API requires `confirm:true` (400 otherwise).

@@ -3,7 +3,7 @@
 #
 # Scope (spec: lab state + /home of the host running the timer — no rootfs):
 #   hosting/coolify/data  Coolify state
-#   network/pihole/data   Pi-hole config
+#   network/adguardhome/data  AdGuard Home config + state
 #   .                     this repo (infrastructure as code)
 #   /home                 host home dirs
 # The actual list comes from BACKUP_PATHS (see backup/.env.example).

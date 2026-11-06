@@ -21,10 +21,10 @@
 - [ ] `docker compose up -d`, re-register the server in the Coolify UI if the instance is fresh, redeploy apps from git.
 - [ ] Decommission staging Coolify: `docker compose down -v` on panther **after** the Pi serves the same sites.
 
-## 3. DNS/DHCP (Pi-hole) — only now, never before
+## 3. DNS/DHCP (AdGuard Home) — only now, never before
 
-- [ ] This is the only phase that must wait for the final host. Follow `docs/runbooks/dhcp-migration.md` end to end: verify the router resolves as DNS2 → Pi-hole DHCP ON → router DHCP OFF → per-device check → note the ad-leak trade-off.
-- [ ] Family rule: the fallback is automatic (DNS2 = router). Nobody has to do anything if Pi-hole dies.
+- [ ] This is the only phase that must wait for the final host. Follow `docs/runbooks/dhcp-migration.md` end to end: seed the config (`network/adguardhome/generate-config.sh`), verify the router resolves as DNS2 → AdGuard Home DHCP ON → router DHCP OFF → per-device check → note the ad-leak trade-off.
+- [ ] Family rule: the fallback is automatic (DNS2 = router). Nobody has to do anything if AdGuard Home dies.
 
 ## 4. Backups
 
