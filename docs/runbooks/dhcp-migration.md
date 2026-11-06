@@ -87,9 +87,9 @@ client.
    `.env`, mirrored into the seeded yaml) do not overlap, and neither contains
    the router's or the server's IP.
 5. **The seeded dhcpv4 block matches your LAN** (pool, gateway, subnet mask,
-   option-6 pair). This block lives in `network/adguardhome/data/conf/
-   AdGuardHome.yaml` — inspect it with the container stopped (see below for
-   why stopped).
+   option-6 pair). This block lives in
+   `network/adguardhome/data/conf/AdGuardHome.yaml` — inspect it with the
+   container stopped (see below for why stopped).
 
 ## Migration order (the two-DHCP window is the dangerous one)
 

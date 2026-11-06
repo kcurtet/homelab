@@ -21,9 +21,9 @@ flowchart TD
 
 All traffic to and from the internet flows through the router. The Raspberry Pi
 provides DNS (AdGuard Home) and DHCP for the whole house, hosts services on Coolify,
-and
-keeps them backed up with restic. Remote access is Tailscale only — the router never
-opens a port. Cloudflare Tunnel publishes public services without exposing the home IP.
+and keeps them backed up with restic. Remote access is Tailscale only — the router
+never opens a port. Cloudflare Tunnel publishes public services without exposing
+the home IP.
 
 ## Current staging
 

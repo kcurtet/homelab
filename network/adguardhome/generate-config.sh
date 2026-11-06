@@ -42,6 +42,8 @@
 #   cp .env.example .env && $EDITOR .env   # set ADGUARD_PASSWORD_HASH at least
 #   ./generate-config.sh                   # writes data/conf/AdGuardHome.yaml
 #   docker compose up -d
+#
+# Exit codes: 0 success; 1 any usage/validation error (see die).
 
 set -euo pipefail
 
@@ -60,6 +62,10 @@ info() {
     printf 'generate-config.sh: %s\n' "$*"
 }
 
+warn() {
+    printf 'generate-config.sh: WARNING: %s\n' "$*" >&2
+}
+
 # Load KEY=VALUE lines without executing anything — same parser and
 # precedence as backup/restic/backup.sh: real environment variables first,
 # then .env next to this script (gitignored), if present.
@@ -68,12 +74,12 @@ load_env_file() {
     while IFS= read -r line || [[ -n "$line" ]]; do
         line=${line%%#*}
         [[ -z "${line//[[:space:]]/}" ]] && continue
-        [[ "$line" == *=* ]] || continue
+        [[ "$line" == *=* ]] || { warn "malformed line in $file (expected KEY=VALUE), skipping: $line"; continue; }
         key=${line%%=*}
         val=${line#*=}
         key=${key#"${key%%[![:space:]]*}"}; key=${key%"${key##*[![:space:]]}"}
         val=${val#"${val%%[![:space:]]*}"}; val=${val%"${val##*[![:space:]]}"}
-        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { warn "malformed key in $file, skipping line: $line"; continue; }
         if [[ ${#val} -ge 2 && ( "$val" == \"*\" || "$val" == \'*\' ) ]]; then
             val=${val:1:${#val}-2}
         fi
@@ -110,7 +116,7 @@ fi
 
 IP_RE='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 valid_ip() {
-    local ip=$1 o
+    local ip=$1 o part
     [[ "$ip" =~ $IP_RE ]] || return 1
     IFS=. read -r -a o <<< "$ip"
     for part in "${o[@]}"; do
@@ -125,6 +131,20 @@ valid_ip "$ADGUARD_HOST_IP" || die "ADGUARD_HOST_IP is not a valid IPv4: $ADGUAR
 valid_ip "$ADGUARD_DNS2_ROUTER" || die "ADGUARD_DNS2_ROUTER is not a valid IPv4: $ADGUARD_DNS2_ROUTER"
 [[ "$ADGUARD_HOST_IP" != "$ADGUARD_DNS2_ROUTER" ]] \
     || die "ADGUARD_HOST_IP and ADGUARD_DNS2_ROUTER are the same ($ADGUARD_HOST_IP): option 6 needs two DIFFERENT resolvers (host, router)"
+
+# The whole DHCP block bakes straight into the yaml: a typo'd pool would seed
+# silently, so validate every address the dangerous window depends on.
+valid_ip "$ADGUARD_DHCP_START"   || die "ADGUARD_DHCP_START is not a valid IPv4: $ADGUARD_DHCP_START"
+valid_ip "$ADGUARD_DHCP_END"     || die "ADGUARD_DHCP_END is not a valid IPv4: $ADGUARD_DHCP_END"
+valid_ip "$ADGUARD_DHCP_GATEWAY" || die "ADGUARD_DHCP_GATEWAY is not a valid IPv4: $ADGUARD_DHCP_GATEWAY"
+valid_ip "$ADGUARD_DHCP_NETMASK" || die "ADGUARD_DHCP_NETMASK is not a valid IPv4 dotted mask: $ADGUARD_DHCP_NETMASK"
+
+# Values are rendered unquoted into the yaml — keep them to shapes that cannot
+# corrupt the file (a stray '#', ':' or space in username/web addr would).
+[[ "$ADGUARD_USERNAME" =~ ^[A-Za-z0-9._-]+$ ]] \
+    || die "ADGUARD_USERNAME must be letters/digits/dot/dash/underscore (yaml-safe): $ADGUARD_USERNAME"
+[[ "$ADGUARD_WEB_ADDR" =~ ^[][0-9A-Fa-f.:]+$ ]] \
+    || die "ADGUARD_WEB_ADDR must be a host:port literal like 0.0.0.0:3000 or [::]:3000: $ADGUARD_WEB_ADDR"
 
 [[ "$ADGUARD_DHCP_LEASE_DURATION" =~ ^[0-9]+$ ]] || die "ADGUARD_DHCP_LEASE_DURATION must be seconds (integer), got: $ADGUARD_DHCP_LEASE_DURATION"
 
