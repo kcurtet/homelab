@@ -119,12 +119,12 @@ describe('stopConfirmMessage', () => {
 });
 
 describe('findContainerByName / containerProject', () => {
-  const containers = [named('coolify', 'hosting'), named('pihole', 'network')];
+  const containers = [named('coolify', 'hosting'), named('adguardhome', 'network')];
 
   it('matches by name (leading slash tolerated) and by exact id', () => {
     expect(findContainerByName(containers, 'coolify')?.Id).toBe('id-coolify');
     expect(findContainerByName(containers, '/coolify')?.Id).toBe('id-coolify');
-    expect(findContainerByName(containers, 'id-pihole')?.Id).toBe('id-pihole');
+    expect(findContainerByName(containers, 'id-adguardhome')?.Id).toBe('id-adguardhome');
     expect(findContainerByName(containers, 'nope')).toBeUndefined();
   });
 

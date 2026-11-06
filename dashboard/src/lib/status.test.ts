@@ -74,7 +74,7 @@ describe('aggregateProjects', () => {
   it('routes containers by com.docker.compose.project label and ignores unlabeled/unexpected ones', () => {
     const containers = [
       raw({ name: 'coolify', project: 'hosting' }),
-      raw({ name: 'pihole', project: 'network' }),
+      raw({ name: 'adguardhome', project: 'network' }),
       raw({ name: 'orphan' }), // no project label → ignored
       raw({ name: 'other', project: 'some-other-project' }), // not expected → ignored
     ];
@@ -83,7 +83,7 @@ describe('aggregateProjects', () => {
     expect(projects[0]).toMatchObject({ name: 'hosting', state: 'up' });
     expect(projects[0].containers.map((c) => c.name)).toEqual(['coolify']);
     expect(projects[1]).toMatchObject({ name: 'network', state: 'up' });
-    expect(projects[1].containers.map((c) => c.name)).toEqual(['pihole']);
+    expect(projects[1].containers.map((c) => c.name)).toEqual(['adguardhome']);
   });
 
   it('exposes per-container name, state and startedAt (null when not running)', () => {

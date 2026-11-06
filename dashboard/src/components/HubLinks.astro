@@ -1,11 +1,11 @@
 ---
 // Hub links to the lab's existing admin UIs. Server-rendered from env
-// (HUB_COOLIFY_URL, HUB_PIHOLE_URL, HUB_TAILSCALE_URL); a missing env simply
+// (HUB_COOLIFY_URL, HUB_ADGUARD_URL, HUB_TAILSCALE_URL); a missing env simply
 // hides that link, and an empty hub hides the whole section.
 // Runtime env first (node adapter container), then dev-time .env.
 const DEFS = [
   { label: 'Coolify', env: 'HUB_COOLIFY_URL' },
-  { label: 'Pi-hole', env: 'HUB_PIHOLE_URL' },
+  { label: 'AdGuard Home', env: 'HUB_ADGUARD_URL' },
   { label: 'Tailscale admin', env: 'HUB_TAILSCALE_URL' },
 ] as const;
 
