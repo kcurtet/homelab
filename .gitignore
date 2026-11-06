@@ -1,7 +1,7 @@
 # Secrets — real values live here, never committed; only .env.example is tracked
 .env
 
-# Runtime data volumes (Coolify state, Pi-hole config, etc.)
+# Runtime data volumes (Coolify state, AdGuard Home config, etc.)
 **/data/
 
 # restic local cache

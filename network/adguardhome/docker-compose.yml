@@ -55,9 +55,9 @@
 #   adguard-dns.io/kb/adguard-home/dhcp/):
 #       options:
 #         - 6 ips <host LAN IP>,<router IP>
-#   Unlike dnsmasq's 0.0.0.0 "this machine" trick, AdGuard Home has no
-#   self-referencing placeholder for option 6: the host's LITERAL LAN IP must
-#   be baked in (ADGUARD_HOST_IP in .env — the seed script wires it). The
+#   Option 6 takes literal IPv4 addresses only — there is no self-referencing
+#   "this machine" placeholder — so the host's LITERAL LAN IP must be baked
+#   in (ADGUARD_HOST_IP in .env — the seed script wires it). The
 #   official DHCP docs warn that when defining option 6 you MUST also include
 #   AdGuard Home's own address, or DHCP clients will bypass its filtering —
 #   the seed puts it first (DNS1), the router second (DNS2).
