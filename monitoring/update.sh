@@ -21,11 +21,17 @@ while IFS= read -r compose_file; do
   skip_file="$dir/update.skip"
   mapfile -t services < <( (cd "$dir" && docker compose config --services) )
 
-  # filter out services listed in update.skip
+  # filter out services listed in update.skip AND services not deployed
+  # (no running container): inert phases (e.g. cloudflared without a token)
+  # must not be `up`-ed into crash-loops by the nightly run.
   to_update=()
   for s in "${services[@]}"; do
     if [[ -f "$skip_file" ]] && grep -qx "$s" "$skip_file"; then
       log "skip (update.skip): $dir/$s"
+      continue
+    fi
+    if [[ -z "$(cd "$dir" && docker compose ps -q --status running "$s" 2>/dev/null)" ]]; then
+      log "skip (not deployed): $dir/$s"
       continue
     fi
     to_update+=("$s")
