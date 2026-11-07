@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Compose config (every stack)
+        run: |
+          for d in monitoring remote-access/splitdns dashboard \
+                   hosting/cloudflare network/adguardhome; do
+            echo "== $d =="
+            (cd "$d" && docker compose config -q)
+          done
+
+      - name: Shell scripts (syntax + shellcheck)
+        run: |
+          bash -n monitoring/update.sh \
+                backup/restic/backup.sh backup/restic/forget.sh \
+                network/adguardhome/generate-config.sh
+          shellcheck monitoring/update.sh \
+                    backup/restic/backup.sh backup/restic/forget.sh \
+                    network/adguardhome/generate-config.sh
+
+      - name: Dashboard tests (vitest)
+        working-directory: dashboard
+        run: |
+          npm ci
+          npx vitest run

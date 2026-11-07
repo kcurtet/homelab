@@ -56,3 +56,9 @@ labels:
 ```
 
 3. `docker compose up -d` — dashboard at `http://proxy.int.ntux.link`.
+
+## Update gate
+
+`update.skip` lists compose services the nightly update must NOT touch
+(`traefik` today — a breaking edge release must not land unattended at 04:00).
+Manual edge update: `docker compose pull traefik && docker compose up -d traefik`.
