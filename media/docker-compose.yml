@@ -132,18 +132,21 @@ services:
       - traefik.http.services.prowlarr.loadbalancer.server.port=9696
     restart: unless-stopped
 
-  jellyseerr:
-    image: fallenbagel/jellyseerr:latest
-    container_name: jellyseerr
+  # Request page for the household (Jellyseerr is dead — Seerr is its
+  # official successor; auto-migrates jellyseerr data, needs init + uid 1000).
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    init: true
+    container_name: seerr
     networks: [web]
     environment:
       TZ: Europe/Madrid
     volumes:
-      - ./data/jellyseerr:/app/config
+      - ./data/seerr:/app/config
     labels:
       - traefik.enable=true
-      - traefik.http.routers.jellyseerr.rule=Host(`peticiones.int.ntux.link`)
-      - traefik.http.services.jellyseerr.loadbalancer.server.port=5055
+      - traefik.http.routers.seerr.rule=Host(`peticiones.int.ntux.link`)
+      - traefik.http.services.seerr.loadbalancer.server.port=5055
     restart: unless-stopped
 
   jellyfin:

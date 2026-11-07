@@ -14,3 +14,6 @@ dashboard/.astro/
 
 # tasteskill working files (direction sheets, inspect screenshots)
 .taste-skill/
+
+# Traefik ACME account key + certs (private material)
+**/traefik/letsencrypt/

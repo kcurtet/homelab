@@ -1,6 +1,38 @@
 entryPoints:
   web:
     address: ":80"
+    # Everything lands on TLS; internal container-to-container calls do not
+    # pass through traefik so the redirect only affects edge traffic.
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        # Wildcard for the whole internal zone, at entrypoint level: every
+        # router (compose labels AND dokku apps) gets TLS with zero extra
+        # config per service.
+        certResolver: le
+        domains:
+          - main: int.ntux.link
+            sans:
+              - "*.int.ntux.link"
+
+certificatesResolvers:
+  le:
+    acme:
+      email: admin@ntux.link
+      storage: /letsencrypt/acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "9.9.9.9:53"
 
 providers:
   docker:

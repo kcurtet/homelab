@@ -11,8 +11,12 @@ services:
     networks: [web]
     ports:
       - "80:80"
+      - "443:443"
+    environment:
+      CLOUDFLARE_DNS_API_TOKEN: ${CF_DNS_TOKEN}
     volumes:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/letsencrypt:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   uptime-kuma:
