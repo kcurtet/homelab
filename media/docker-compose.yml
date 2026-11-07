@@ -202,6 +202,25 @@ services:
       LOG_LEVEL: info
     restart: unless-stopped
 
+  # Rotación de biblioteca: expira contenido según reglas (arranca con UNA
+  # regla conservadora: películas vistas +90d sin tag de protección).
+  # Los borrados van VÍA Radarr → recycle bin de 14 días.
+  maintainerr:
+    image: ghcr.io/jorenn92/maintainerr:latest
+    container_name: maintainerr
+    networks: [web]
+    environment:
+      TZ: Europe/Madrid
+    volumes:
+      - ./data/maintainerr:/opt/data
+      - /data/media/movies:/media/movies:ro
+      - /data/media/tv:/media/tv:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.maintainerr.rule=Host(`limpieza.int.ntux.link`)
+      - traefik.http.services.maintainerr.loadbalancer.server.port=6245
+    restart: unless-stopped
+
   # Extracts finished archives so sonarr/radarr can import them.
   # Idle (and harmless) until the API keys land in .env after first setup.
   unpackerr:
