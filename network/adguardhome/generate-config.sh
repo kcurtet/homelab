@@ -117,6 +117,9 @@ fi
 # literal IP. Staging hosts sharing :53 (e.g. systemd-resolved on loopback,
 # dnsmasq on the tailscale IP) must bind AdGuard to their free LAN IP only.
 : "${ADGUARD_DNS_BIND:=0.0.0.0}"
+# DNSSEC validation of upstream answers (dns.dnssec_enabled in the seed).
+# true = AdGuard validates signatures itself regardless of upstream behavior.
+: "${ADGUARD_DNSSEC:=false}"
 
 IP_RE='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 valid_ip() {
@@ -209,6 +212,8 @@ dns:
   bind_hosts:
     - ${ADGUARD_DNS_BIND}
   port: 53
+  # Validate upstream DNSSEC signatures client-side (SERVFAIL on bogus).
+  dnssec_enabled: ${ADGUARD_DNSSEC}
   # Failover pair advertised by DHCP lives below (option 6); these upstreams
   # are where AdGuard Home itself forwards non-blocked queries.
   upstream_dns:
