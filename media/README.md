@@ -60,6 +60,21 @@ Then, in order:
 6. **Jellyseerr** (`peticiones.int.ntux.link`): point it at Jellyfin +
    Sonarr/Radarr.
 
+## Indexer tags (the part everyone trips on)
+
+Prowlarr applies **indexer proxies by TAG** — a proxy with no matching tag
+applies to nothing. Two lanes are wired:
+
+| Tag | Proxy | For |
+|---|---|---|
+| `cf` | FlareSolverr (21hsmw fork — the official image can't solve modern CF) | indexers behind Cloudflare (EZTV) |
+| `vpn` | gluetun built-in HTTP proxy (:8888 via Proton) | ISP-blocked domains (0dayfiles.net, TLS reset by SNI filtering) |
+
+Add the tag when creating the indexer (or edit it after). ISP context:
+Spanish resolvers sinkhole blocked domains (127.0.0.1) and some domains
+also fail TLS from home IPs — container DNS goes through AdGuard (see
+docker-host.md), VPN-tagged indexers escape entirely.
+
 ## Notes
 
 - **Port forwarding** (better peering) needs a **paid** Proton plan; on
