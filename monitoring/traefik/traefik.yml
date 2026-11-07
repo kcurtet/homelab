@@ -1,0 +1,15 @@
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: monitoring_web
+
+api:
+  dashboard: false   # enable: see README (basic-auth + proxy.int.ntux.link)
+
+log:
+  level: INFO

@@ -1,0 +1,13 @@
+name: splitdns
+
+services:
+  dnsmasq:
+    image: dockurr/dnsmasq
+    container_name: dnsmasq
+    restart: unless-stopped
+    ports:
+      # Bind ONLY the tailscale IP: systemd-resolved owns loopback :53
+      - "${TS_IP}:53:53/udp"
+      - "${TS_IP}:53:53"
+    volumes:
+      - ./dnsmasq.conf:/etc/dnsmasq.conf:ro
