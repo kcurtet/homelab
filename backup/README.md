@@ -11,7 +11,8 @@ running the timer** — nothing else.
 
 | Source | What it is | Notes |
 |---|---|---|
-| `hosting/coolify/data/` | Coolify state: apps, deployments, webhooks | The lab's crown jewels |
+| `/home/dokku` + app volumes | Dokku state: app configs, git repos | Covered by the `/home` scope |
+| `monitoring/data/` | Uptime Kuma state | Monitors + history |
 | `network/adguardhome/data/` | AdGuard Home config + state | Raspberry era; tiny (or absent) until then |
 | `.` (this repo) | The lab definition itself | Infrastructure as code |
 | `/home` | Home dirs of the backup host | The irreplaceable part |

@@ -113,6 +113,10 @@ fi
 : "${ADGUARD_DHCP_NETMASK:=255.255.255.0}"
 : "${ADGUARD_DHCP_LEASE_DURATION:=86400}"
 : "${ADGUARD_WEB_ADDR:=0.0.0.0:3000}"
+# DNS listen address: 0.0.0.0 (all interfaces — Raspberry era) or a single
+# literal IP. Staging hosts sharing :53 (e.g. systemd-resolved on loopback,
+# dnsmasq on the tailscale IP) must bind AdGuard to their free LAN IP only.
+: "${ADGUARD_DNS_BIND:=0.0.0.0}"
 
 IP_RE='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 valid_ip() {
@@ -173,7 +177,9 @@ fi
 ### Write the seed ############################################################
 
 mkdir -p "$CONF_DIR" "$WORK_DIR"
-chmod 700 "$WORK_DIR" # quiet the app's permcheck (work dir wants 0700)
+# quiet the app's permcheck (work dir wants 0700). Non-fatal: a previous
+# container run may have left the dir root-owned; re-seeding still works.
+chmod 700 "$WORK_DIR" 2>/dev/null || echo "note: could not chmod $WORK_DIR (root-owned from a previous run?) — continuing"
 
 # NOTE (upstream DNS): plain-IP upstreams keep first boot dependency-free;
 #   encrypted upstreams (https://dns.quad9.net/dns-query, tls://…, quic://…)
@@ -201,7 +207,7 @@ theme: auto
 language: en
 dns:
   bind_hosts:
-    - 0.0.0.0
+    - ${ADGUARD_DNS_BIND}
   port: 53
   # Failover pair advertised by DHCP lives below (option 6); these upstreams
   # are where AdGuard Home itself forwards non-blocked queries.

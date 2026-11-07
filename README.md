@@ -1,7 +1,7 @@
 # Homelab
 
-Reproducible home lab: AdGuard Home as house DNS/DHCP with automatic failover, Coolify
-self-hosted PaaS published through a Cloudflare Tunnel, Tailscale remote access, and
+Reproducible home lab: AdGuard Home as house DNS/DHCP with automatic failover, Dokku
+push-to-deploy app hosting behind a shared Traefik edge, Tailscale remote access, and
 restic backups to USB. Every phase is plain Docker Compose + runbooks.
 
 Background and design rationale: [docs/topology.md](docs/topology.md).
@@ -17,18 +17,20 @@ Background and design rationale: [docs/topology.md](docs/topology.md).
 Install in order. Phases are independent, but the order minimizes blast radius.
 From a fresh clone, per phase:
 
-### 1. Hosting — Coolify
+### 1. Hosting — Dokku (push-to-deploy)
 
 ```bash
-cd hosting/coolify
-cp .env.example .env        # then fill APP_KEY, DB_PASSWORD (commands inside)
-docker compose up -d        # wizard at http://<host>:8000
+# see hosting/dokku/README.md — install (AUR overlay on Arch, official on Debian),
+# then per app:
+dokku apps:create myapp
+git remote add dokku dokku@<host>:myapp
+git push dokku main          # build + deploy behind Traefik
 ```
 
-Deploy a sample site and teardown instructions:
-[docs/runbooks/hosting.md](docs/runbooks/hosting.md).
-Publishing without open ports (Cloudflare Tunnel) and Let's Encrypt are documented
-in the same runbook plus [docs/runbooks/cloudflare-tunnel.md](docs/runbooks/cloudflare-tunnel.md)
+Full runbook with the Traefik integration pattern and Arch gotchas:
+[hosting/dokku/README.md](hosting/dokku/README.md).
+Publishing without open ports (Cloudflare Tunnel) and Let's Encrypt are documented in
+[docs/runbooks/cloudflare-tunnel.md](docs/runbooks/cloudflare-tunnel.md)
 (requires a Cloudflare account/domain).
 
 ### 2. Remote access — Tailscale (+ optional WoL)
@@ -85,7 +87,8 @@ curl -s http://127.0.0.1:4321/api/status        # dashboard answers (phase 5)
 ## Repository layout
 
 ```
-hosting/        # coolify/ and cloudflare/ compose (Phase 1)
+hosting/        # dokku/ runbook — push-to-deploy behind Traefik (Phase 1)
+monitoring/     # traefik + uptime-kuma + update timer (staging edge)
 remote-access/  # tailscale.md + wol/ script (Phase 2)
 network/        # adguardhome/ compose + .env.example + config seed (Phase 3)
 backup/         # restic scripts + systemd units (Phase 4)

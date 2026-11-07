@@ -1,25 +1,31 @@
-# Cloudflare Tunnel (cloudflared) — publish services without opening router ports
+# Cloudflare Tunnel (cloudflared) — publish services without opening
+# router ports
 #
 # REFERENCE CONTENT ONLY — this stack is intentionally INERT until a Cloudflare
 # account, a domain and a tunnel exist. It is kept in the repo so the publishing
 # path is ready the day the account does: see docs/runbooks/cloudflare-tunnel.md
-# (STATUS: PENDING ACCOUNT). `docker compose config` validates today; `up` with an
+# (STATUS: PENDING ACCOUNT). `docker compose config` validates today; `up`
+# with an
 # empty token just makes cloudflared exit — the runbook is the activation path.
 #
-# Image: official cloudflare/cloudflared, pinned to 2026.10.7 (Docker Hub, checked
+# Image: official cloudflare/cloudflared, pinned to 2026.10.7 (Docker Hub,
+# checked
 # 2026-11-05; published for amd64 and arm64 — arm64 matters for the Raspberry Pi
-# target). Same policy as the Coolify compose: version control over auto-upgrade.
+# target). Version control over auto-upgrade, like the rest of the repo.
 #
 # Design notes:
 #   - Token mode (`tunnel run` + TUNNEL_TOKEN) is the zero-config connector: the
 #     ingress rules (public hostname → internal service) live in Cloudflare's
-#     dashboard, not here, so repointing a hostname needs no change to this file.
+#     dashboard, not here, so repointing a hostname needs no change to
+#     this file.
 #   - No ports published, ever. cloudflared dials OUT to Cloudflare's edge; the
-#     router forwards nothing to this host (lab rule: opening ports is a last resort).
-#   - extra_hosts maps host.docker.internal to the host gateway so ingress rules can
-#     target Coolify services as http://host.docker.internal:<port>. From inside the
-#     container, `localhost:<port>` is the container itself — a classic gotcha,
-#     documented in the runbook.
+#     router forwards nothing to this host (lab rule: opening ports is a
+#     last resort).
+#   - extra_hosts maps host.docker.internal to the host gateway so ingress
+#     rules can target the traefik edge: http://host.docker.internal:80 (the
+#     vhost carries the Host header through). Not `localhost:<port>` — from
+#     inside the container that is the container itself (classic gotcha,
+#     documented in the runbook).
 name: hosting
 
 services:

@@ -16,11 +16,16 @@ services:
     restart: unless-stopped
     environment:
       - DOCKER_HOST=tcp://socket-proxy:2375
-      - EXPECTED_PROJECTS=hosting,network,dashboard
+      - EXPECTED_PROJECTS=${EXPECTED_PROJECTS:-hosting,network,dashboard}
     ports:
       - "127.0.0.1:${DASHBOARD_PORT:-4321}:4321"
     networks:
       - dash-internal
+      - web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dashboard.rule=Host(`dashboard.int.ntux.link`)
+      - traefik.http.services.dashboard.loadbalancer.server.port=4321
     depends_on:
       - socket-proxy
 
@@ -52,3 +57,6 @@ services:
 networks:
   dash-internal:
     internal: true
+  web:
+    name: monitoring_web
+    external: true

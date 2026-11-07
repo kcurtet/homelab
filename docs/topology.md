@@ -9,7 +9,7 @@ and the key design decision that fixes the original setup's single point of fail
 flowchart TD
     IN(("Internet"))
     R["Home router<br/>DNS2 — fallback resolver"]
-    PI["Raspberry Pi 5 — final server<br/>• AdGuard Home: DNS1 + DHCP<br/>• Coolify: hosting<br/>• restic: backups → USB disk<br/>• Tailscale subnet router<br/>• Wake-on-LAN sender"]
+    PI["Raspberry Pi 5 — final server<br/>• AdGuard Home: DNS1 + DHCP<br/>• Dokku: hosting (push-to-deploy)<br/>• restic: backups → USB disk<br/>• Tailscale subnet router<br/>• Wake-on-LAN sender"]
     F["Household devices<br/>DNS1 = AdGuard Home · DNS2 = router"]
 
     IN <-- "WAN" --> R
@@ -20,7 +20,7 @@ flowchart TD
 ```
 
 All traffic to and from the internet flows through the router. The Raspberry Pi
-provides DNS (AdGuard Home) and DHCP for the whole house, hosts services on Coolify,
+provides DNS (AdGuard Home) and DHCP for the whole house, hosts services on Dokku,
 and keeps them backed up with restic. Remote access is Tailscale only — the router
 never opens a port. Cloudflare Tunnel publishes public services without exposing
 the home IP.
@@ -34,7 +34,7 @@ The Raspberry Pi is not on-site yet. Until it arrives, every phase is validated 
 flowchart LR
     IN(("Internet"))
     R["Home router<br/>(unmodified: DNS + DHCP stay here during staging)"]
-    P["panther — staging laptop (CachyOS)<br/>• Coolify (staging)<br/>• Tailscale client"]
+    P["panther — staging laptop (CachyOS)<br/>• Dokku (staging) + monitoring stack<br/>• Tailscale client"]
     L["lynx — dev machine<br/>(repo is written here)"]
 
     IN <--> R
@@ -69,7 +69,7 @@ failover has been verified — see `network/` and `docs/runbooks/dhcp-migration.
 The lab was first built and documented by hand in
 [Reconstruyendo mi homelab: autohospedaje de cero](https://kcurtet.com/proyectos/homelab/)
 (Spanish). That article is the origin story: AdGuard Home as house-wide DNS+DHCP, Tailscale +
-Wake-on-LAN for remote access, Coolify hosting published through a Cloudflare Tunnel,
+Wake-on-LAN for remote access, Dokku apps published through a Cloudflare Tunnel,
 and restic backups to an old USB disk.
 
 This repo turns that setup into something anyone (including future me) can clone,

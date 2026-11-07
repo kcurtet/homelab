@@ -82,12 +82,13 @@ Two gotchas:
 - **Not `localhost`.** Ingress URLs are dialed from *inside the cloudflared
   container*. `localhost:<port>` there is the container itself. The compose maps
   `host.docker.internal` to the host gateway, so `host.docker.internal:<port>`
-  reaches ports Coolify published on the host. (The LAN IP of the host works
-  too, but is less portable across the staging → Raspberry retarget.)
-- **The app must have a port on the host.** Coolify apps whose domain is empty
-  get a high published port (see `hosting.md` step 3) — use that number. Later,
-  you can instead set the app's domain in Coolify and have its Traefik listen on
-  80/443 locally, then point the tunnel at `host.docker.internal:80`.
+  reaches ports published on the host — e.g. Traefik's `:80`. (The LAN IP of
+  the host works too, but is less portable across the staging → Raspberry
+  retarget.)
+- **Point the tunnel at the Traefik edge.** With Dokku behind Traefik, the
+  ingress URL is `host.docker.internal:80` and the vhost routing
+  (`app.int.ntux.link`) carries the Host header through; no per-app ports
+  needed. If you prefer a direct port, `dokku ports:add` publishes one.
 
 DNS for the hostname is created automatically by the tunnel's ingress (an
 AAAA/CNAME record pointing to the tunnel — never to the home IP).
@@ -117,7 +118,7 @@ created for it. `rm -f .env` removes the token from disk.
 - [ ] Tunnel listed as **HEALTHY** in Zero Trust → Networks → Tunnels.
 - [ ] At least one public hostname → `host.docker.internal:<port>` ingress rule.
 - [ ] `curl -I https://<public-hostname>` answers with the expected status
-      (e.g. `200` or a redirect from the Coolify app) — from **outside** the LAN
+      (e.g. `200` or a redirect from the app) — from **outside** the LAN
       (phone on mobile data) as a second check.
 - [ ] Router admin page confirms: no port forwards added, none needed.
 - [ ] `hosting/cloudflare/.env` is **not** tracked: `git status --short` clean

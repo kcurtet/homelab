@@ -1,0 +1,12 @@
+[Unit]
+Description=Homelab daily image updates (compose stacks + dokku apps)
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/kx/dev/homelab/monitoring/update.sh
+# Protect the host: no new privileges, filesystem mostly read-only except
+# what compose/dokku genuinely need
+NoNewPrivileges=true
+PrivateTmp=true

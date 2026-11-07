@@ -5,21 +5,21 @@
 ## 0. Arrival inspection — decision point
 
 - [ ] Pi 5 8 GB boots; the SSD is detected (`lsblk`, `smartctl` if available).
-- [ ] If the Pi arrives **broken or underdelivered** (wrong model, dead USB, RMA): fall back to the documented split — **Coolify stays on panther; the Pi takes only DNS/DHCP + backups** when replaced. If no Pi at all, panther keeps running everything until one arrives.
+- [ ] If the Pi arrives **broken or underdelivered** (wrong model, dead USB, RMA): fall back to the documented split — **Dokku stays on panther; the Pi takes only DNS/DHCP + backups** when replaced. If no Pi at all, panther keeps running everything until one arrives.
 
 ## 1. Base system
 
-- [ ] Install Raspberry Pi OS **64-bit** on the SSD (not an SD card: Coolify's database and restic will hammer the storage).
+- [ ] Install Raspberry Pi OS **64-bit** on the SSD (not an SD card: restic and the databases will hammer the storage).
 - [ ] Static IP on the LAN (or DHCP reservation) — same idea as staging: stable address for ssh, docs and DNS.
 - [ ] Bring it into the tailnet (`remote-access/tailscale.md`) and approve its subnet route for `192.168.1.0/24` in the admin console.
 - [ ] Install Docker: `docs/runbooks/docker-host.md` (Debian path). Verify with `docker run --rm hello-world`.
 
-## 2. Hosting (Coolify)
+## 2. Hosting (Dokku)
 
-- [ ] `rsync` the repo checkout + `hosting/coolify/data/` from panther to the Pi (or fresh clone + restore `data/` only).
+- [ ] `rsync` the repo checkout + `/home/dokku` from panther to the Pi (or fresh install + re-push apps from git).
 - [ ] `cp .env.example .env` on the Pi (fresh secrets: APP_KEY, DB_PASSWORD — do not copy staging secrets to the final host).
-- [ ] `docker compose up -d`, re-register the server in the Coolify UI if the instance is fresh, redeploy apps from git.
-- [ ] Decommission staging Coolify: `docker compose down -v` on panther **after** the Pi serves the same sites.
+- [ ] Re-run the dokku install runbook (official Debian path), restore ssh-keys/domains config, redeploy apps with `git push`.
+- [ ] Decommission staging Dokku: `dokku --force apps:destroy` each app + `pacman -Rns dokku` on panther **after** the Pi serves the same sites.
 
 ## 3. DNS/DHCP (AdGuard Home) — only now, never before
 
@@ -34,5 +34,5 @@
 
 ## 5. Decommission staging (eventually)
 
-- [ ] When the Pi has been stable for a couple of weeks: stop the timer and Coolify on panther, remove Docker if the laptop returns to daily use.
+- [ ] When the Pi has been stable for a couple of weeks: stop the timers and Dokku on panther, remove Docker if the laptop returns to daily use.
 - [ ] panther's `/data` USB disk is personal storage — untouched by all of this.

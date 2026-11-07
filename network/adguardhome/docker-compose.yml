@@ -98,9 +98,15 @@ services:
     # No HEALTHCHECK in the official image (alpine base, dig absent). Probe
     # the special healthcheck.adguardhome.test domain through the local DNS
     # server — verified live, see RESEARCH above. Port 53 is dns.port's
-    # default (we never change it).
+    # default (we never change it). Probe the ACTUAL dns bind address:
+    # staging binds a single LAN IP (ADGUARD_DNS_BIND in .env), where
+    # 127.0.0.1 would refuse.
     healthcheck:
-      test: ["CMD", "nslookup", "healthcheck.adguardhome.test", "127.0.0.1"]
+      test:
+        - CMD
+        - nslookup
+        - healthcheck.adguardhome.test
+        - ${ADGUARD_DNS_BIND:-127.0.0.1}
       interval: 30s
       timeout: 5s
       retries: 3
