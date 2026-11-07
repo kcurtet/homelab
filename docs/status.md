@@ -12,6 +12,7 @@
 | Dashboard — status + actions UI | **Live on panther** (traefik vhost `dashboard.int.ntux.link`; EXPECTED_PROJECTS → monitoring/splitdns/dashboard) |
 | Monitoring — traefik + uptime-kuma + update timer | Live on panther (rootful docker); migrated from podman quadlets |
 | Split-DNS — tailnet `*.int.ntux.link` | Live on panther (dnsmasq, tailscale IP only); migrated from podman |
+| Media — arr suite + jellyfin (VPN) | **Live on panther**: sonarr/radarr/prowlarr/jellyseerr/jellyfin (vhosts) + qbittorrent behind gluetun (Proton TCP 443, Japan) + unpackerr + port-forwarder; library on `/data/media` |
 
 Design and build artifacts (spec, plan, rulings ledger) live under `specs/` in
 Spanish — the working log of how this was designed and built.

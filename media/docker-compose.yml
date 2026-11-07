@@ -1,0 +1,178 @@
+name: media
+
+# Media phase: *arr automation + Jellyfin, behind the lab's traefik edge.
+# Downloads are sealed inside gluetun (Proton VPN) — if the tunnel drops,
+# qBittorrent stops. Everything else rides the normal bridge with vhosts.
+#
+# Layout on /data (NOT in restic scope — media is big and re-fetchable):
+#   /data/media/downloads   qBittorrent incomplete+complete
+#   /data/media/movies      Radarr destination
+#   /data/media/tv          Sonarr destination
+# Container state under ./data/ (also excluded from backups by size policy).
+
+networks:
+  web:
+    name: monitoring_web
+    external: true
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add: [NET_ADMIN]
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./data/gluetun:/gluetun
+    ports:
+      - "8080:8080"   # qBittorrent WebUI (published through the VPN netns)
+      - "8000:8000"   # gluetun control API (port-forward status)
+    environment:
+      VPN_SERVICE_PROVIDER: protonvpn
+      VPN_TYPE: openvpn
+      OPENVPN_USER: ${PROTON_USER}
+      OPENVPN_PASSWORD: ${PROTON_PASS}
+      SERVER_COUNTRIES: ${VPN_COUNTRY:-Netherlands}
+      # TCP 443: home networks often mangle/deprioritize UDP 1194; TCP is
+      # slower per-connection but the tunnel actually comes up.
+      OPENVPN_PROTOCOL: tcp
+      SERVER_PORT: "443"
+      VPN_PORT_FORWARDING: "on"
+      VPN_PORT_FORWARDING_PROVIDER: protonvpn   # needs a paid plan
+      HTTP_CONTROL_SERVER_ADDRESS: ":8000"
+      TZ: Europe/Madrid
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"   # no vhost: shares the VPN netns
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Madrid
+      WEBUI_PORT: "8080"
+    volumes:
+      - ./data/qbittorrent:/config
+      - /data/media/downloads:/downloads
+    restart: unless-stopped
+
+  # Syncs gluetun's forwarded port into qBittorrent (better peering).
+  # Needs the qBittorrent credentials in .env (set after first login);
+  # retries harmlessly until then. Free Proton plans get no forwarded port.
+  qbittorrent-port-forwarder:
+    image: mjmeli/qbittorrent-port-forward-gluetun-server
+    container_name: qbittorrent-port-forwarder
+    depends_on:
+      qbittorrent:
+        condition: service_started
+    environment:
+      QBT_ADDR: http://gluetun:8080
+      QBT_USERNAME: ${QBT_USERNAME}
+      QBT_PASSWORD: ${QBT_PASSWORD}
+      GTN_ADDR: http://gluetun:8000
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    networks: [web]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Madrid
+    volumes:
+      - ./data/sonarr:/config
+      - /data/media/tv:/tv
+      - /data/media/downloads:/downloads
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.int.ntux.link`)
+      - traefik.http.services.sonarr.loadbalancer.server.port=8989
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    networks: [web]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Madrid
+    volumes:
+      - ./data/radarr:/config
+      - /data/media/movies:/movies
+      - /data/media/downloads:/downloads
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.radarr.rule=Host(`radarr.int.ntux.link`)
+      - traefik.http.services.radarr.loadbalancer.server.port=7878
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    networks: [web]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Madrid
+    volumes:
+      - ./data/prowlarr:/config
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.int.ntux.link`)
+      - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+    restart: unless-stopped
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    networks: [web]
+    environment:
+      TZ: Europe/Madrid
+    volumes:
+      - ./data/jellyseerr:/app/config
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.jellyseerr.rule=Host(`peticiones.int.ntux.link`)
+      - traefik.http.services.jellyseerr.loadbalancer.server.port=5055
+    restart: unless-stopped
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    networks: [web]
+    devices:
+      - /dev/dri:/dev/dri   # Intel QSV transcode (NVIDIA/NVENC: see README)
+    environment:
+      TZ: Europe/Madrid
+    volumes:
+      - ./data/jellyfin/config:/config
+      - ./data/jellyfin/cache:/cache
+      - /data/media/movies:/media/movies:ro
+      - /data/media/tv:/media/tv:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.jellyfin.rule=Host(`jellyfin.int.ntux.link`)
+      - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+    restart: unless-stopped
+
+  # Extracts finished archives so sonarr/radarr can import them.
+  # Idle (and harmless) until the API keys land in .env after first setup.
+  unpackerr:
+    image: golift/unpackerr
+    container_name: unpackerr
+    environment:
+      TZ: Europe/Madrid
+      UN_SONARR_0_URL: http://sonarr:8989
+      UN_SONARR_0_API_KEY: ${SONARR_API_KEY:-}
+      UN_RADARR_0_URL: http://radarr:7878
+      UN_RADARR_0_API_KEY: ${RADARR_API_KEY:-}
+      UN_WEBSERVER_METRICS: "false"
+    volumes:
+      - /data/media/downloads:/downloads
+    restart: unless-stopped
