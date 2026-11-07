@@ -37,6 +37,30 @@ Docker Compose v2 ships as a plugin (`docker compose`) in both paths.
 
 Membership in the `docker` group is root-equivalent on that host: anyone in it can mount the host filesystem into a container. Only add users you fully trust, and never enable remote access to the Docker socket without TLS.
 
+### ufw vs containers (learned the hard way, 2026-11-07)
+
+Two different paths, two different rules:
+
+- **Bridge containers with published ports** (traefik `:80`, dnsmasq on the
+  tailscale IP): traffic is DNAT-ed and walks the FORWARD/DOCKER chains —
+  ufw's INPUT policy never sees it. Works regardless of ufw.
+- **Host-networked containers** (AdGuard Home, `network_mode: host`): their
+  ports land on the host stack → INPUT chain → **dropped by ufw's default
+  deny**. This silently blocks LAN clients AND other containers trying to
+  reach the host IP (e.g. an Uptime Kuma DNS probe to the AdGuard resolver —
+  `ETIMEOUT`). Tests from the host itself pass via `lo`, so the trap is
+  invisible until you test from another device or container.
+
+Fix: explicit allows for host-networked services (see
+  `network/adguardhome`):
+
+```bash
+sudo ufw allow from 192.168.1.0/24 to any port 53 proto tcp comment 'AdGuard DNS LAN'
+sudo ufw allow from 192.168.1.0/24 to any port 53 proto udp comment 'AdGuard DNS LAN'
+sudo ufw allow from 172.16.0.0/12 to any port 53 comment 'DNS host services from docker'
+sudo ufw allow from 192.168.1.0/24 to any port 3000 proto tcp comment 'AdGuard UI LAN'
+```
+
 ## Verify
 
 ```bash
