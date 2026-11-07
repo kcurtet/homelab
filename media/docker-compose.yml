@@ -168,6 +168,26 @@ services:
       - traefik.http.services.jellyfin.loadbalancer.server.port=8096
     restart: unless-stopped
 
+  # Subtitles manager: auto-downloads Spanish subs for the whole library
+  # and everything new, straight from Sonarr/Radarr metadata.
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    networks: [web]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Madrid
+    volumes:
+      - ./data/bazarr:/config
+      - /data/media/movies:/movies
+      - /data/media/tv:/tv
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bazarr.rule=Host(`subtitulos.int.ntux.link`)
+      - traefik.http.services.bazarr.loadbalancer.server.port=6767
+    restart: unless-stopped
+
   # Headless browser that solves Cloudflare challenges for indexers behind
   # them. No published port (internal only): Prowlarr reaches it by container
   # DNS once the URL is set (see README, first boot step 2b).
