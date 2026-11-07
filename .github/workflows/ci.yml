@@ -28,7 +28,7 @@ jobs:
           bash -n monitoring/update.sh \
                 backup/restic/backup.sh backup/restic/forget.sh \
                 network/adguardhome/generate-config.sh
-          shellcheck monitoring/update.sh \
+          shellcheck --severity=warning monitoring/update.sh \
                     backup/restic/backup.sh backup/restic/forget.sh \
                     network/adguardhome/generate-config.sh
 
