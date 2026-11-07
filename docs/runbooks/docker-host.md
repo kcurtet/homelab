@@ -61,6 +61,24 @@ sudo ufw allow from 172.16.0.0/12 to any port 53 comment 'DNS host services from
 sudo ufw allow from 192.168.1.0/24 to any port 3000 proto tcp comment 'AdGuard UI LAN'
 ```
 
+## Container DNS via AdGuard (Spain: ISP DNS poisoning)
+
+Spanish ISPs sinkhole court-blocked domains at their resolvers
+(`x1337x.cc -> 127.0.0.1` -> instant "connection refused"). The lab's
+containers must not inherit that via the host's resolver chain, so the
+daemon resolves through the lab's own AdGuard (clean upstream), with Quad9
+as fallback:
+
+```json
+// /etc/docker/daemon.json
+{ "dns": ["192.168.1.100", "9.9.9.9"] }
+```
+
+`systemctl restart docker` (live-restore keeps containers up), then recreate
+containers for the new resolv.conf to apply. Verified 2026-11-07: prowlarr
+went from connection-refused to the real Cloudflare edge (403 -> solved by
+FlareSolverr).
+
 ## Verify
 
 ```bash
