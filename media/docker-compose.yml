@@ -161,6 +161,18 @@ services:
       - traefik.http.services.jellyfin.loadbalancer.server.port=8096
     restart: unless-stopped
 
+  # Headless browser that solves Cloudflare challenges for indexers behind
+  # them. No published port (internal only): Prowlarr reaches it by container
+  # DNS once the URL is set (see README, first boot step 2b).
+  flaresolverr:
+    image: flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    networks: [web]
+    environment:
+      TZ: Europe/Madrid
+      LOG_LEVEL: info
+    restart: unless-stopped
+
   # Extracts finished archives so sonarr/radarr can import them.
   # Idle (and harmless) until the API keys land in .env after first setup.
   unpackerr:
