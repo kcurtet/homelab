@@ -218,7 +218,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.maintainerr.rule=Host(`limpieza.int.ntux.link`)
-      - traefik.http.services.maintainerr.loadbalancer.server.port=6245
+      - traefik.http.services.maintainerr.loadbalancer.server.port=6246
     restart: unless-stopped
 
   # Extracts finished archives so sonarr/radarr can import them.
