@@ -166,6 +166,9 @@ services:
       - traefik.enable=true
       - traefik.http.routers.jellyfin.rule=Host(`jellyfin.int.ntux.link`)
       - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+      # public face via Cloudflare Tunnel (hosting/cloudflare):
+      - traefik.http.routers.jellyfin-public.rule=Host(`jellyfin.kcurtet.com`)
+      - traefik.http.routers.jellyfin-public.service=jellyfin@docker
     restart: unless-stopped
 
   # Subtitles manager: auto-downloads Spanish subs for the whole library
