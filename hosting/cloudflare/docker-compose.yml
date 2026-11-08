@@ -28,6 +28,15 @@
 #     documented in the runbook).
 name: hosting
 
+# Joined to the lab's shared network so console ingress rules can target
+# the traefik edge directly: service https://traefik:443 with
+# "Origin Server Name: jellyfin.int.ntux.link" (SNI) — the wildcard cert
+# terminates TLS inside the tunnel.
+networks:
+  web:
+    name: monitoring_web
+    external: true
+
 services:
   cloudflared:
     image: cloudflare/cloudflared:2026.10.7
@@ -36,5 +45,6 @@ services:
     command: tunnel run
     extra_hosts:
       - host.docker.internal:host-gateway
+    networks: [web]
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN}
